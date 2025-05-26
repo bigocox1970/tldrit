@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { Summary } from '../types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
@@ -32,6 +33,16 @@ export async function signOut() {
 
 export async function getCurrentUser() {
   console.log('[supabase] getCurrentUser called');
+  
+  // First check the session
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  console.log('[supabase] session check:', { sessionData, sessionError });
+  
+  if (sessionError || !sessionData?.session) {
+    console.log('[supabase] no valid session');
+    return { user: null, error: sessionError };
+  }
+
   const { data, error } = await supabase.auth.getUser();
   console.log('[supabase] supabase.auth.getUser result:', { data, error });
   if (error || !data?.user) {
