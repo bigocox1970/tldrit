@@ -104,10 +104,11 @@ export const useAuthStore = create<AuthState>()(
       },
       
       checkAuthState: async () => {
+        console.log('[authStore] checkAuthState called');
         set({ isLoading: true });
         try {
           const { user, error } = await getCurrentUser();
-          
+          console.log('[authStore] getCurrentUser result:', { user, error });
           if (error || !user) {
             set({ 
               user: null, 
@@ -115,22 +116,24 @@ export const useAuthStore = create<AuthState>()(
               isLoading: false, 
               error: error?.message || null 
             });
+            console.log('[authStore] set: not authenticated', { error });
             return;
           }
-          
           set({ 
             user: user ? { ...user, email: user.email || '' } : null, 
             isAuthenticated: true, 
             isLoading: false, 
             error: null 
           });
-        } catch {
+          console.log('[authStore] set: authenticated', { user });
+        } catch (e) {
           set({ 
             user: null, 
             isAuthenticated: false, 
             isLoading: false, 
             error: 'Failed to get authentication state' 
           });
+          console.log('[authStore] set: error in checkAuthState', e);
         }
       },
     }),

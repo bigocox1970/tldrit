@@ -73,7 +73,9 @@ export const useSummaryStore = create<SummaryState>((set, get) => ({
         processedContent = request.content;
         originalContentKey = request.content;
       } else if (request.contentType === 'url') {
+        console.log('[summaryStore] Calling extractContentFromUrl with:', request.content);
         processedContent = await extractContentFromUrl(request.content);
+        console.log('[summaryStore] extractContentFromUrl returned:', processedContent);
         originalContentKey = request.content; // Use the input URL as the key
       } else if (request.contentType === 'file') {
         processedContent = await processFileContent(request.content as unknown as File);

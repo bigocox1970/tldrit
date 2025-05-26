@@ -31,8 +31,11 @@ export async function signOut() {
 }
 
 export async function getCurrentUser() {
+  console.log('[supabase] getCurrentUser called');
   const { data, error } = await supabase.auth.getUser();
+  console.log('[supabase] supabase.auth.getUser result:', { data, error });
   if (error || !data?.user) {
+    console.log('[supabase] getCurrentUser: no user', { error });
     return { user: null, error };
   }
 
@@ -42,8 +45,9 @@ export async function getCurrentUser() {
     .select('*')
     .eq('id', data.user.id)
     .single();
+  console.log('[supabase] profile fetch result:', { profile, profileError });
 
-  return {
+  const result = {
     user: {
       id: data.user.id,
       email: data.user.email,
@@ -53,6 +57,8 @@ export async function getCurrentUser() {
     },
     error: profileError,
   };
+  console.log('[supabase] getCurrentUser returning:', result);
+  return result;
 }
 
 export async function saveUserInterests(userId: string, interests: string[]) {
