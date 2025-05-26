@@ -1,2 +1,17 @@
 [build]
-  functions = "netlify/functions" 
+  functions = "netlify/functions"
+
+[[redirects]]
+  from = "/api/extract-url"
+  to = "/.netlify/functions/extract-url"
+  status = 200
+
+[[redirects]]
+  from = "/api/process-file"
+  to = "/.netlify/functions/process-file"
+  status = 200
+
+[[redirects]]
+  from = "/api/text-to-speech"
+  to = "/.netlify/functions/text-to-speech"
+  status = 200

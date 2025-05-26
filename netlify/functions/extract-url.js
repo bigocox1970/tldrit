@@ -96,10 +96,11 @@ exports.handler = async function(event, context) {
       }
     }
 
-    // Clean up the content
+    // Clean up the content while preserving some structure
     content = content
-      .replace(/\s+/g, ' ') // Replace multiple whitespace with single space
-      .replace(/\n+/g, ' ') // Replace newlines with space
+      .replace(/\s*\n\s*\n\s*/g, '\n\n') // Preserve paragraph breaks
+      .replace(/\s*\n\s*/g, ' ') // Convert single line breaks to spaces
+      .replace(/\s+/g, ' ') // Replace multiple spaces with single space
       .trim();
 
     // Limit content length

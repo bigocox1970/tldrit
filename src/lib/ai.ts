@@ -133,7 +133,7 @@ export async function extractContentFromUrl(url: string) {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await axios.post('/.netlify/functions/extract-url', { url }, { headers });
+    const response = await axios.post('/api/extract-url', { url }, { headers });
     return response.data.content;
   } catch (error) {
     console.error('Error extracting content from URL:', error);
