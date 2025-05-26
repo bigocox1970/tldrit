@@ -2,11 +2,8 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { FileText } from 'lucide-react';
 import Button from '../ui/Button';
-import { useAuthStore } from '../../store/authStore';
 
 const HeroSection: React.FC = () => {
-  const { isAuthenticated } = useAuthStore();
-  
   return (
     <div className="py-8 px-4 sm:px-6 text-center">
       <div className="flex justify-center mb-6">
@@ -30,14 +27,6 @@ const HeroSection: React.FC = () => {
             Start Summarizing
           </Button>
         </Link>
-        
-        {!isAuthenticated && (
-          <Link to="/register">
-            <Button variant="outline" size="lg">
-              Create Account
-            </Button>
-          </Link>
-        )}
       </div>
     </div>
   );
