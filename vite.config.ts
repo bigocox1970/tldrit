@@ -12,6 +12,7 @@
  * - /api/extract-url → Supabase function (URL content extraction)
  * - /api/text-to-speech → Supabase function (audio generation)
  * - /api/process-file → Production Netlify function (PDF/file processing)
+ * - /api/rss-proxy → Production Netlify function (RSS proxy for CORS)
  * 
  * The process-file endpoint uses the production Netlify function because:
  * 1. PDF processing libraries aren't compatible with Supabase Edge Runtime
@@ -64,6 +65,7 @@ export default defineConfig(({ mode }) => {
       exclude: ['lucide-react'],
     },
     server: {
+      port: 5177,
       proxy: supabaseUrl ? {
         '/api/extract-url': {
           target: supabaseUrl,
@@ -110,6 +112,16 @@ export default defineConfig(({ mode }) => {
               if (authHeader) {
                 proxyReq.setHeader('Authorization', authHeader);
               }
+            });
+          }
+        },
+        '/api/rss-proxy': {
+          target: 'https://tldrit.netlify.app',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api/, '/.netlify/functions'),
+          configure: (proxy) => {
+            proxy.on('error', (err) => {
+              console.log('proxy error', err);
             });
           }
         }

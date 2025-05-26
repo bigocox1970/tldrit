@@ -1,18 +1,29 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { useNewsStore } from '../../store/newsStore';
+import { useAuthStore } from '../../store/authStore';
 import NewsItem from './NewsItem';
 import Button from '../ui/Button';
 import { RefreshCw } from 'lucide-react';
 
 const NewsFeed: React.FC = () => {
   const { newsItems, fetchNewsItems, refreshNews, isLoading } = useNewsStore();
+  const { isAuthenticated } = useAuthStore();
   
-  useEffect(() => {
+  // Memoize the fetch function to prevent unnecessary re-renders
+  const memoizedFetchNewsItems = useCallback(() => {
     fetchNewsItems();
   }, [fetchNewsItems]);
   
+  useEffect(() => {
+    memoizedFetchNewsItems();
+  }, [memoizedFetchNewsItems]);
+  
   const handleRefresh = async () => {
-    await refreshNews();
+    if (isAuthenticated) {
+      await refreshNews();
+    } else {
+      await fetchNewsItems();
+    }
   };
   
   if (isLoading && newsItems.length === 0) {

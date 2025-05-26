@@ -1,9 +1,14 @@
 import { create } from 'zustand';
 import { NewsItem, UserInterest } from '../types';
-import { getAvailableInterests, getNewsItems, saveUserInterests } from '../lib/supabase';
+import { getAvailableInterests, saveUserInterests } from '../lib/supabase';
 import { useAuthStore } from './authStore';
-import { generateAudio } from '../lib/ai';
-import { supabase } from '../lib/supabase';
+import { generateAudio, summarizeUrl } from '../lib/ai';
+
+interface TLDROptions {
+  summaryLevel: number;
+  isEli5: boolean;
+  eli5Level?: number;
+}
 
 interface NewsState {
   newsItems: NewsItem[];
@@ -11,10 +16,13 @@ interface NewsState {
   selectedInterests: string[];
   isLoading: boolean;
   error: string | null;
+  isFetching: boolean;
+  tldrLoading: { [newsItemId: string]: boolean };
   fetchNewsItems: () => Promise<void>;
   fetchAvailableInterests: () => Promise<void>;
   updateUserInterests: (interests: string[]) => Promise<void>;
   generateAudioForNewsItem: (newsItemId: string) => Promise<void>;
+  generateTLDRForNewsItem: (newsItemId: string, options?: TLDROptions) => Promise<void>;
   refreshNews: () => Promise<void>;
 }
 
@@ -24,40 +32,68 @@ export const useNewsStore = create<NewsState>((set, get) => ({
   selectedInterests: [],
   isLoading: false,
   error: null,
+  isFetching: false,
+  tldrLoading: {},
   
   fetchNewsItems: async () => {
-    const user = useAuthStore.getState().user;
-    if (!user) return;
+    const state = get();
     
-    set({ isLoading: true, error: null });
+    // Prevent duplicate fetches (React Strict Mode issue)
+    if (state.isFetching) {
+      console.log('Already fetching news, skipping duplicate request');
+      return;
+    }
+    
+    set({ isLoading: true, error: null, isFetching: true });
+    
+    const user = useAuthStore.getState().user;
+    
     try {
-      const { data, error } = await getNewsItems(user.id);
+      let categories: string[];
       
-      if (error) {
-        set({ error: error.message, isLoading: false });
-        return;
+      if (user && user.interests.length > 0) {
+        // Use user's selected interests
+        categories = user.interests;
+      } else {
+        // Use default categories for non-authenticated users or users without interests
+        categories = ['crypto', 'ai', 'entertainment', 'science', 'politics', 'sports', 'technology'];
       }
       
-      const formattedNews: NewsItem[] = data?.map(item => ({
-        id: item.id,
-        title: item.title,
-        sourceUrl: item.source_url,
-        category: item.category,
-        summary: item.summary,
-        publishedAt: item.published_at,
-        imageUrl: item.image_url,
-        audioUrl: item.audio_url,
-      })) || [];
+      console.log('Fetching news for categories:', categories);
+      
+      // Use Netlify function for reliable news fetching with images
+      const response = await fetch('/.netlify/functions/fetch-news', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ categories }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to fetch news');
+      }
+
+      const newsItems: NewsItem[] = data.newsItems || [];
       
       set({ 
-        newsItems: formattedNews, 
+        newsItems, 
         isLoading: false, 
-        error: null 
+        error: null,
+        isFetching: false
       });
-    } catch {
+    } catch (err) {
+      console.error('Error fetching news items:', err);
       set({ 
         error: 'Failed to fetch news', 
-        isLoading: false 
+        isLoading: false,
+        isFetching: false
       });
     }
   },
@@ -149,32 +185,54 @@ export const useNewsStore = create<NewsState>((set, get) => ({
       });
     }
   },
+
+  generateTLDRForNewsItem: async (newsItemId: string, options?: TLDROptions) => {
+    const user = useAuthStore.getState().user;
+    if (!user) {
+      set({ error: 'Please log in to generate TLDR summaries' });
+      return;
+    }
+    
+    const newsItem = get().newsItems.find(item => item.id === newsItemId);
+    if (!newsItem) return;
+
+    // Check if TLDR already exists
+    if (newsItem.tldr) {
+      return;
+    }
+    
+    // Set loading state for this specific item
+    set(state => ({
+      tldrLoading: { ...state.tldrLoading, [newsItemId]: true },
+      error: null
+    }));
+    
+    try {
+      console.log(`Generating TLDR for: ${newsItem.title}`);
+      
+      // Use the existing summarizeUrl function from ai.ts with options
+      const tldrSummary = await summarizeUrl(newsItem.sourceUrl, user.isPremium, options);
+      
+      set(state => ({
+        newsItems: state.newsItems.map(item => 
+          item.id === newsItemId 
+            ? { ...item, tldr: tldrSummary } 
+            : item
+        ),
+        tldrLoading: { ...state.tldrLoading, [newsItemId]: false },
+        error: null,
+      }));
+    } catch (error) {
+      console.error('Error generating TLDR:', error);
+      set(state => ({
+        tldrLoading: { ...state.tldrLoading, [newsItemId]: false },
+        error: 'Failed to generate TLDR summary'
+      }));
+    }
+  },
   
   refreshNews: async () => {
-    const user = useAuthStore.getState().user;
-    if (!user) return;
-    
-    set({ isLoading: true, error: null });
-    try {
-      const { data } = await supabase.auth.getSession();
-      const accessToken = data?.session?.access_token;
-      if (!accessToken) throw new Error('No access token');
-      const response = await fetch('/.netlify/functions/fetch-news', {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-        },
-      });
-      
-      if (!response.ok) throw new Error('Failed to refresh news');
-      
-      await get().fetchNewsItems();
-      
-      set({ isLoading: false, error: null });
-    } catch {
-      set({ 
-        error: 'Failed to refresh news', 
-        isLoading: false 
-      });
-    }
+    // Simply call fetchNewsItems to refresh using Netlify function
+    await get().fetchNewsItems();
   },
 }));

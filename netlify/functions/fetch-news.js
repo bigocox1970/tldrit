@@ -8,6 +8,11 @@ const RSS_FEEDS = {
   business: "https://www.cnbc.com/id/100003114/device/rss/rss.xml",
   science: "https://www.sciencedaily.com/rss/top/science.xml",
   crypto: "https://www.coindesk.com/arc/outboundfeeds/rss/",
+  health: "https://www.medicalnewstoday.com/rss",
+  entertainment: "https://www.eonline.com/news.rss",
+  sports: "https://www.espn.com/espn/rss/news",
+  politics: "https://feeds.npr.org/1001/rss.xml",
+  ai: "https://www.artificialintelligence-news.com/feed/",
 };
 
 exports.handler = async function(event, context) {
@@ -18,8 +23,47 @@ exports.handler = async function(event, context) {
   const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   const parser = new Parser();
 
-  // For MVP, use default interests
-  const userInterests = ["technology", "world", "business"];
+  // Get authorization header
+  const authHeader = event.headers.authorization;
+  if (!authHeader) {
+    return {
+      statusCode: 401,
+      body: JSON.stringify({ error: 'Authorization header required' }),
+    };
+  }
+
+  // Set the auth token for supabase
+  const token = authHeader.replace('Bearer ', '');
+  supabase.auth.setSession({ access_token: token, refresh_token: '' });
+
+  // Get current user
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) {
+    return {
+      statusCode: 401,
+      body: JSON.stringify({ error: 'Invalid authentication' }),
+    };
+  }
+
+  // Get user's interests from profile
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('interests')
+    .eq('id', user.id)
+    .single();
+
+  if (profileError) {
+    console.error('Error fetching user profile:', profileError);
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: 'Failed to fetch user profile' }),
+    };
+  }
+
+  // Use user's interests or default to general categories
+  const userInterests = profile?.interests && profile.interests.length > 0 
+    ? profile.interests 
+    : ["technology", "world", "business"];
 
   const newsItems = [];
   for (const interest of userInterests) {
@@ -85,4 +129,4 @@ async function summarizeArticle(content, OPENAI_API_KEY) {
     console.error("Error summarizing article:", error);
     return content.slice(0, 200) + "...";
   }
-} 
+}

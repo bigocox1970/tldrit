@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RSS Test</title>
+</head>
+<body>
+    <h1>RSS Feed Test</h1>
+    <div id="status">Loading...</div>
+    <div id="results"></div>
+
+    <script>
+        // Test RSS feed fetching
+        async function testRSSFeed() {
+            const statusDiv = document.getElementById('status');
+            const resultsDiv = document.getElementById('results');
+            
+            try {
+                statusDiv.textContent = 'Testing RSS feed fetch...';
+                
+                // Test with a simple RSS feed
+                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent('https://feeds.bbci.co.uk/news/world/rss.xml')}`;
+                
+                const response = await fetch(proxyUrl);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                const xmlContent = data.contents;
+                
+                // Parse the XML
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(xmlContent, 'text/xml');
+                
+                const items = xmlDoc.querySelectorAll('item');
+                
+                statusDiv.textContent = `Success! Found ${items.length} news items`;
+                
+                // Display first 3 items
+                let html = '<h2>Sample News Items:</h2>';
+                for (let i = 0; i < Math.min(3, items.length); i++) {
+                    const item = items[i];
+                    const title = item.querySelector('title')?.textContent || 'No title';
+                    const description = item.querySelector('description')?.textContent || 'No description';
+                    const link = item.querySelector('link')?.textContent || '#';
+                    
+                    html += `
+                        <div style="border: 1px solid #ccc; margin: 10px 0; padding: 10px;">
+                            <h3><a href="${link}" target="_blank">${title}</a></h3>
+                            <p>${description.replace(/<[^>]*>/g, '').substring(0, 200)}...</p>
+                        </div>
+                    `;
+                }
+                
+                resultsDiv.innerHTML = html;
+                
+            } catch (error) {
+                statusDiv.textContent = `Error: ${error.message}`;
+                console.error('RSS test failed:', error);
+            }
+        }
+        
+        // Run the test when page loads
+        testRSSFeed();
+    </script>
+</body>
+</html>

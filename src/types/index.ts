@@ -28,6 +28,7 @@ export interface NewsItem {
   publishedAt: string;
   imageUrl?: string;
   audioUrl?: string;
+  tldr?: string;
 }
 
 export interface SummaryRequest {

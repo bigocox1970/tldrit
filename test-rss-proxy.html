@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RSS Proxy Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .loading {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+            max-height: 300px;
+        }
+    </style>
+</head>
+<body>
+    <h1>RSS Proxy Test</h1>
+    <p>This page tests the RSS proxy functionality for TLDRit news feeds.</p>
+    
+    <div>
+        <button onclick="testSingleFeed()">Test Single Feed (TechCrunch)</button>
+        <button onclick="testAllFeeds()">Test All Feeds</button>
+        <button onclick="clearResults()">Clear Results</button>
+    </div>
+    
+    <div id="results"></div>
+
+    <script>
+        const RSS_FEEDS = {
+            technology: "https://feeds.feedburner.com/TechCrunch",
+            world: "https://feeds.bbci.co.uk/news/world/rss.xml",
+            business: "https://feeds.feedburner.com/reuters/businessNews",
+            science: "https://rss.cnn.com/rss/edition.rss",
+            crypto: "https://cointelegraph.com/rss",
+            health: "https://rss.cnn.com/rss/cnn_health.rss",
+            entertainment: "https://feeds.feedburner.com/variety/headlines",
+            sports: "https://rss.espn.com/rss/news",
+            politics: "https://feeds.npr.org/1001/rss.xml",
+            ai: "https://feeds.feedburner.com/venturebeat/SZYF",
+        };
+
+        function addResult(message, type = 'loading') {
+            const resultsDiv = document.getElementById('results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `test-result ${type}`;
+            resultDiv.innerHTML = message;
+            resultsDiv.appendChild(resultDiv);
+            resultsDiv.scrollTop = resultsDiv.scrollHeight;
+            return resultDiv;
+        }
+
+        function updateResult(resultDiv, message, type) {
+            resultDiv.className = `test-result ${type}`;
+            resultDiv.innerHTML = message;
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+
+        async function testRSSFeed(category, url) {
+            const resultDiv = addResult(`Testing ${category} feed...`, 'loading');
+            
+            try {
+                const proxyUrl = `/api/rss-proxy?url=${encodeURIComponent(url)}`;
+                const startTime = Date.now();
+                
+                const response = await fetch(proxyUrl);
+                const endTime = Date.now();
+                const duration = endTime - startTime;
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                
+                // Parse the RSS content to count items
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(data.contents, 'text/xml');
+                const items = xmlDoc.querySelectorAll('item');
+                
+                updateResult(resultDiv, 
+                    `✅ <strong>${category}</strong>: Success! Found ${items.length} items (${duration}ms)<br>
+                     <small>URL: ${url}</small>`, 
+                    'success'
+                );
+                
+                return { success: true, category, itemCount: items.length, duration };
+            } catch (error) {
+                updateResult(resultDiv, 
+                    `❌ <strong>${category}</strong>: Failed - ${error.message}<br>
+                     <small>URL: ${url}</small>`, 
+                    'error'
+                );
+                
+                return { success: false, category, error: error.message };
+            }
+        }
+
+        async function testSingleFeed() {
+            await testRSSFeed('technology', RSS_FEEDS.technology);
+        }
+
+        async function testAllFeeds() {
+            clearResults();
+            addResult('Starting comprehensive RSS feed test...', 'loading');
+            
+            const results = [];
+            let successCount = 0;
+            let totalDuration = 0;
+            
+            for (const [category, url] of Object.entries(RSS_FEEDS)) {
+                const result = await testRSSFeed(category, url);
+                results.push(result);
+                
+                if (result.success) {
+                    successCount++;
+                    totalDuration += result.duration;
+                }
+                
+                // Small delay between requests to be nice to servers
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+            
+            // Summary
+            const summaryDiv = addResult('', 'loading');
+            const avgDuration = successCount > 0 ? Math.round(totalDuration / successCount) : 0;
+            
+            updateResult(summaryDiv, 
+                `<strong>Test Summary:</strong><br>
+                 ✅ Successful: ${successCount}/${results.length}<br>
+                 ⏱️ Average response time: ${avgDuration}ms<br>
+                 📊 Success rate: ${Math.round((successCount / results.length) * 100)}%`, 
+                successCount === results.length ? 'success' : 
+                successCount > 0 ? 'loading' : 'error'
+            );
+        }
+    </script>
+</body>
+</html>

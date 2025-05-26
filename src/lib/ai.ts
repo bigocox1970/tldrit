@@ -6,12 +6,14 @@
  * - URL content extraction
  * - File content processing
  * - Audio generation for summaries
+ * - TLDR generation for news articles
  * 
  * KEY FUNCTIONS:
  * - summarizeContent(): Main AI summarization with ELI5 support
  * - extractContentFromUrl(): Extracts text from web pages
  * - processFileContent(): Processes uploaded files (PDF, TXT, DOCX)
  * - generateAudio(): Creates audio versions of summaries
+ * - summarizeUrl(): Creates TLDR summaries from URLs
  * 
  * API ROUTING:
  * - OpenAI: Used for basic summarization (free users, short content)
@@ -31,6 +33,13 @@ interface SummarizeOptions {
   isEli5: boolean;
   summaryLevel: number;
   eli5Level?: number;
+  isNewsArticle?: boolean;
+}
+
+interface TLDROptions {
+  summaryLevel?: number;
+  isEli5?: boolean;
+  eli5Level?: number;
 }
 
 function getEliPrompt(age: number) {
@@ -44,7 +53,7 @@ function getEliPrompt(age: number) {
 }
 
 export async function summarizeContent(content: string, options: SummarizeOptions) {
-  const { isPremium, isEli5, summaryLevel, eli5Level } = options;
+  const { isPremium, isEli5, summaryLevel, eli5Level, isNewsArticle } = options;
   
   // Determine which API to use based on content length and user's subscription
   const useOpenRouter = isPremium && content.length > 1000;
@@ -58,16 +67,26 @@ export async function summarizeContent(content: string, options: SummarizeOption
   // Adjust summary length based on slider level (1-5)
   const summaryLength = getSummaryLengthFromLevel(summaryLevel);
   
+  // Create enhanced system message for news articles
+  const newsSpecificInstructions = isNewsArticle 
+    ? "You are creating a TLDR summary for a news article. Do NOT repeat the title or headline. Focus on the key facts, events, and important details from the article content. Provide actionable insights and context that goes beyond what's already in the title."
+    : "You are an expert at creating concise, accurate summaries while preserving key information. Focus on main points and maintain the original tone.";
+  
   // Create system message
   const explicitEliPrompt = isEli5 ? `${getEliPrompt(eli5Level || 5)} The higher the age, the more advanced and detailed the explanation should be.` : '';
   const systemMessage = isEli5
-    ? `You are an expert at explaining complex topics. ${explicitEliPrompt} Keep explanations clear, engaging, and use simple analogies when helpful.`
-    : "You are an expert at creating concise, accurate summaries while preserving key information. Focus on main points and maintain the original tone.";
+    ? `You are an expert at explaining complex topics. ${explicitEliPrompt} Keep explanations clear, engaging, and use simple analogies when helpful. ${newsSpecificInstructions}`
+    : newsSpecificInstructions;
+  
+  // Create enhanced user message for news articles
+  const newsPrompt = isNewsArticle 
+    ? `Create a TLDR summary of the following news article content. Do NOT include or repeat the title/headline. Focus on the main facts, events, and key details from the article body. Provide context and insights in about ${summaryLength} words:`
+    : `Summarize the following in about ${summaryLength} words:`;
   
   // Create user message
   const userMessage = isEli5
-    ? `${getEliPrompt(eli5Level || 5)} The higher the age, the more advanced and detailed the explanation should be. Explain the following in about ${summaryLength} words:\n\n${content}`
-    : `Summarize the following in about ${summaryLength} words:\n\n${content}`;
+    ? `${getEliPrompt(eli5Level || 5)} The higher the age, the more advanced and detailed the explanation should be. ${newsPrompt}\n\n${content}`
+    : `${newsPrompt}\n\n${content}`;
 
   try {
     const headers: Record<string, string> = {
@@ -184,5 +203,32 @@ export async function processFileContent(file: File) {
   } catch (error) {
     console.error('Error processing file:', error);
     throw new Error('Failed to process file');
+  }
+}
+
+// TLDR function for news articles - extracts content from URL and creates a concise summary
+export async function summarizeUrl(url: string, isPremium: boolean = false, tldrOptions?: TLDROptions): Promise<string> {
+  try {
+    // First extract content from the URL
+    const content = await extractContentFromUrl(url);
+    
+    if (!content || content.trim().length === 0) {
+      throw new Error('No content could be extracted from the URL');
+    }
+
+    // Create a TLDR summary using AI with custom options, specifically for news articles
+    const summaryOptions: SummarizeOptions = {
+      isPremium,
+      isEli5: tldrOptions?.isEli5 || false,
+      summaryLevel: tldrOptions?.summaryLevel || 2, // Default to short summary for TLDR
+      eli5Level: tldrOptions?.eli5Level,
+      isNewsArticle: true // Flag to indicate this is a news article
+    };
+
+    const result = await summarizeContent(content, summaryOptions);
+    return result.summary;
+  } catch (error) {
+    console.error('Error creating TLDR summary:', error);
+    throw new Error('Failed to create TLDR summary');
   }
 }
