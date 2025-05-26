@@ -31,7 +31,7 @@ export interface NewsItem {
 }
 
 export interface SummaryRequest {
-  content: string;
+  content: string | File;
   contentType: 'text' | 'url' | 'file';
   summaryLevel: number;
   isEli5: boolean;

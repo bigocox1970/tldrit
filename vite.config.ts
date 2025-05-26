@@ -1,3 +1,24 @@
+/**
+ * VITE CONFIGURATION FOR TLDRIT
+ * 
+ * This file configures the development server and build process for TLDRit.
+ * 
+ * KEY FEATURES:
+ * - PWA support with service worker and manifest
+ * - Development proxy routing for API calls
+ * - React and TypeScript support
+ * 
+ * PROXY CONFIGURATION:
+ * - /api/extract-url → Supabase function (URL content extraction)
+ * - /api/text-to-speech → Supabase function (audio generation)
+ * - /api/process-file → Production Netlify function (PDF/file processing)
+ * 
+ * The process-file endpoint uses the production Netlify function because:
+ * 1. PDF processing libraries aren't compatible with Supabase Edge Runtime
+ * 2. This ensures consistent PDF processing in both dev and production
+ * 3. Local development gets the same reliable file processing as production
+ */
+
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
@@ -44,10 +65,42 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       proxy: supabaseUrl ? {
-        '/api': {
+        '/api/extract-url': {
           target: supabaseUrl,
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/api/, '/functions/v1'),
+          configure: (proxy) => {
+            proxy.on('error', (err) => {
+              console.log('proxy error', err);
+            });
+            proxy.on('proxyReq', (proxyReq, req) => {
+              const authHeader = req.headers.authorization;
+              if (authHeader) {
+                proxyReq.setHeader('Authorization', authHeader);
+              }
+            });
+          }
+        },
+        '/api/text-to-speech': {
+          target: supabaseUrl,
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api/, '/functions/v1'),
+          configure: (proxy) => {
+            proxy.on('error', (err) => {
+              console.log('proxy error', err);
+            });
+            proxy.on('proxyReq', (proxyReq, req) => {
+              const authHeader = req.headers.authorization;
+              if (authHeader) {
+                proxyReq.setHeader('Authorization', authHeader);
+              }
+            });
+          }
+        },
+        '/api/process-file': {
+          target: 'https://tldrit.netlify.app',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api/, '/.netlify/functions'),
           configure: (proxy) => {
             proxy.on('error', (err) => {
               console.log('proxy error', err);

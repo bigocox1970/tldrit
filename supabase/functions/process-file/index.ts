@@ -1,3 +1,25 @@
+/**
+ * SUPABASE PROCESS-FILE FUNCTION
+ * 
+ * This function handles file processing in the Supabase Edge Runtime environment.
+ * 
+ * IMPORTANT NOTE: This function has limitations due to Supabase Edge Runtime:
+ * - PDF processing libraries (pdfjs-dist, pdf-parse) are not compatible
+ * - Only TXT files can be processed directly
+ * - PDF and DOCX files redirect users to use the production Netlify deployment
+ * 
+ * ARCHITECTURE DECISION:
+ * - Local development routes to production Netlify function for full PDF support
+ * - This function serves as a fallback and provides clear error messages
+ * - Maintains authentication and file size validation
+ * 
+ * SUPPORTED OPERATIONS:
+ * - TXT file processing: Direct text extraction
+ * - File size validation: 5MB (free) / 20MB (premium)
+ * - User authentication: Validates Supabase auth tokens
+ * - Error handling: Provides informative error messages
+ */
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -80,10 +102,8 @@ serve(async (req: Request) => {
       );
     }
 
-    // In a real implementation, you would process the file based on its type
-    // (e.g., extract text from PDF, parse DOCX, etc.)
-    // This is a mock implementation
-    const content = await mockFileProcessing(file);
+    // Process the file based on its type
+    const content = await processFile(file);
 
     return new Response(
       JSON.stringify({
@@ -98,7 +118,7 @@ serve(async (req: Request) => {
   } catch (error) {
     console.error("Error processing request:", error);
     return new Response(
-      JSON.stringify({ error: "Failed to process file" }),
+      JSON.stringify({ error: "Failed to process file: " + error.message }),
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -107,17 +127,22 @@ serve(async (req: Request) => {
   }
 });
 
-// Mock file processing function
-async function mockFileProcessing(file: File): Promise<string> {
-  // In a real implementation, this would extract text from various file formats
-  return `This is simulated content extracted from the file: ${file.name}
+// File processing function
+async function processFile(file: File): Promise<string> {
+  const fileName = file.name.toLowerCase();
   
-  In a production environment, we would:
-  1. Determine the file type based on extension and MIME type
-  2. Use appropriate libraries to extract text content
-  3. For PDFs: Use a PDF parser library
-  4. For DOCX: Use a Word document parser
-  5. For TXT: Simply read the text content
-  
-  The document would contain several pages of content that would be processed for summarization.`;
+  if (fileName.endsWith('.txt')) {
+    // Process text files
+    const text = await file.text();
+    return text;
+  } else if (fileName.endsWith('.pdf')) {
+    // For PDFs, we'll need to use a different approach since pdfjs-dist doesn't work in Supabase Edge Runtime
+    // For now, return an informative error directing users to use the production deployment
+    throw new Error('PDF processing requires the production deployment. Please use the deployed version of the app for PDF file uploads, or convert your PDF to text format.');
+  } else if (fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
+    // For Word documents
+    throw new Error('DOCX processing is not yet implemented. Please convert your document to text format.');
+  } else {
+    throw new Error('Unsupported file type. Please upload TXT files, or use the production deployment for PDF support.');
+  }
 }

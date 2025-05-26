@@ -71,7 +71,7 @@ const SummarizeForm: React.FC = () => {
       }
       
       await createSummary({
-        content: inputType === 'file' ? file as unknown as string : content,
+        content: inputType === 'file' ? file! : content,
         contentType: inputType,
         summaryLevel,
         isEli5,
@@ -103,7 +103,7 @@ const SummarizeForm: React.FC = () => {
     }
     try {
       await createSummary({
-        content: inputType === 'file' ? file as unknown as string : content,
+        content: inputType === 'file' ? file! : content,
         contentType: inputType,
         summaryLevel: level,
         isEli5: eli5,

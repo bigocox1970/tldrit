@@ -26,9 +26,14 @@ exports.handler = async function(event, context) {
   }
 
   try {
+    console.log('Processing file upload...');
+    console.log('Content-Type:', event.headers['content-type']);
+    
     // Parse multipart form data
     const boundary = event.headers['content-type'].split('boundary=')[1];
     const parts = multipart.parse(Buffer.from(event.body, 'base64'), boundary);
+    
+    console.log('Parsed parts:', parts?.length || 0);
     
     if (!parts || parts.length === 0) {
       return {
@@ -42,18 +47,25 @@ exports.handler = async function(event, context) {
     const filename = file.filename;
     const fileData = file.data;
     
+    console.log('Processing file:', filename, 'Size:', fileData?.length || 0);
+    
     let content = '';
 
     // Process based on file type
     if (filename.toLowerCase().endsWith('.pdf')) {
       try {
+        console.log('Processing PDF file...');
         const pdfData = await pdf(fileData);
         content = pdfData.text;
+        console.log('PDF content extracted, length:', content.length);
       } catch (error) {
-        throw new Error('Failed to process PDF file');
+        console.error('PDF processing error:', error);
+        throw new Error('Failed to process PDF file: ' + error.message);
       }
     } else if (filename.toLowerCase().endsWith('.txt')) {
+      console.log('Processing TXT file...');
       content = fileData.toString('utf-8');
+      console.log('TXT content extracted, length:', content.length);
     } else if (filename.toLowerCase().endsWith('.docx')) {
       // For DOCX files, we'd need a library like mammoth
       // For now, return an error message
@@ -62,11 +74,18 @@ exports.handler = async function(event, context) {
       throw new Error('Unsupported file type. Please upload PDF, TXT, or DOCX files.');
     }
 
-    // Clean up the content
+    if (!content || content.trim().length === 0) {
+      throw new Error('No content could be extracted from the file');
+    }
+
+    // Clean up the content but preserve some formatting
     content = content
       .replace(/\s+/g, ' ') // Replace multiple whitespace with single space
-      .replace(/\n+/g, ' ') // Replace newlines with space
+      .replace(/\n\s*\n/g, '\n\n') // Preserve paragraph breaks
       .trim();
+
+    console.log('Final content length:', content.length);
+    console.log('Content preview:', content.substring(0, 100) + '...');
 
     // Limit content length (adjust based on user's subscription)
     if (content.length > 10000) {

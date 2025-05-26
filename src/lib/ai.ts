@@ -1,3 +1,24 @@
+/**
+ * AI LIBRARY - CORE AI INTEGRATION
+ * 
+ * This library handles all AI-related operations for TLDRit, including:
+ * - Content summarization using OpenAI/OpenRouter
+ * - URL content extraction
+ * - File content processing
+ * - Audio generation for summaries
+ * 
+ * KEY FUNCTIONS:
+ * - summarizeContent(): Main AI summarization with ELI5 support
+ * - extractContentFromUrl(): Extracts text from web pages
+ * - processFileContent(): Processes uploaded files (PDF, TXT, DOCX)
+ * - generateAudio(): Creates audio versions of summaries
+ * 
+ * API ROUTING:
+ * - OpenAI: Used for basic summarization (free users, short content)
+ * - OpenRouter: Used for premium users with longer content
+ * - Content extraction: Routes through Vite proxy to backend functions
+ */
+
 import axios from 'axios';
 // import { SummaryRequest } from '../types';
 import { supabase } from './supabase';
@@ -142,15 +163,22 @@ export async function extractContentFromUrl(url: string) {
 }
 
 export async function processFileContent(file: File) {
+  // Get the current user's session and access token
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+
   const formData = new FormData();
   formData.append('file', file);
   
   try {
-    const response = await axios.post('/api/process-file', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+    const headers: Record<string, string> = {
+      'Content-Type': 'multipart/form-data',
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await axios.post('/api/process-file', formData, { headers });
     
     return response.data.content;
   } catch (error) {

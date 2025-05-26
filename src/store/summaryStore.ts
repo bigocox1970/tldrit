@@ -1,3 +1,23 @@
+/**
+ * SUMMARY STORE - ZUSTAND STATE MANAGEMENT
+ * 
+ * This store manages all summary-related state and operations for TLDRit.
+ * 
+ * KEY RESPONSIBILITIES:
+ * - Processing different content types (text, URL, file)
+ * - Creating summaries using AI
+ * - Managing summary history and persistence
+ * - Generating audio for summaries
+ * 
+ * CONTENT PROCESSING FLOW:
+ * 1. Text: Direct processing
+ * 2. URL: Extract content via Supabase function → summarize
+ * 3. File: Process via Netlify function → summarize
+ * 
+ * The createSummary function handles all three input types and routes them
+ * through the appropriate processing pipeline before generating summaries.
+ */
+
 import { create } from 'zustand';
 import { Summary, SummaryRequest } from '../types';
 import { extractContentFromUrl, generateAudio, processFileContent, summarizeContent } from '../lib/ai';
@@ -70,15 +90,17 @@ export const useSummaryStore = create<SummaryState>((set, get) => ({
       let originalContentKey = '';
       
       if (request.contentType === 'text') {
-        processedContent = request.content;
-        originalContentKey = request.content;
+        processedContent = request.content as string;
+        originalContentKey = request.content as string;
       } else if (request.contentType === 'url') {
         console.log('[summaryStore] Calling extractContentFromUrl with:', request.content);
-        processedContent = await extractContentFromUrl(request.content);
+        processedContent = await extractContentFromUrl(request.content as string);
         console.log('[summaryStore] extractContentFromUrl returned:', processedContent);
-        originalContentKey = request.content; // Use the input URL as the key
+        originalContentKey = request.content as string; // Use the input URL as the key
       } else if (request.contentType === 'file') {
-        processedContent = await processFileContent(request.content as unknown as File);
+        console.log('[summaryStore] Processing file:', (request.content as File).name);
+        processedContent = await processFileContent(request.content as File);
+        console.log('[summaryStore] File processing returned:', processedContent.substring(0, 100) + '...');
         originalContentKey = (request.content as File).name;
       }
       
