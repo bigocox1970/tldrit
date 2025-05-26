@@ -55,32 +55,41 @@ export const useNewsStore = create<NewsState>((set, get) => ({
         // Use user's selected interests
         categories = user.interests;
       } else {
-        // Use default categories for non-authenticated users or users without interests
-        categories = ['crypto', 'ai', 'entertainment', 'science', 'politics', 'sports', 'technology'];
+      // Use default categories for non-authenticated users or users without interests
+      categories = ['technology', 'world', 'business', 'science', 'crypto', 'ai'];
       }
       
       console.log('Fetching news for categories:', categories);
       
-      // Use Netlify function for reliable news fetching with images
-      const response = await fetch('/.netlify/functions/fetch-news', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ categories }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
+      let newsItems: NewsItem[] = [];
       
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to fetch news');
-      }
+      // Try Netlify function first (for production), fallback to direct RSS parsing (for local dev)
+      try {
+        const response = await fetch('/.netlify/functions/fetch-news', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ categories }),
+        });
 
-      const newsItems: NewsItem[] = data.newsItems || [];
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success) {
+            newsItems = data.newsItems || [];
+          } else {
+            throw new Error(data.error || 'Failed to fetch news');
+          }
+        } else {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+      } catch (error) {
+        console.log('Netlify function not available, using direct RSS parsing for local development:', error);
+        
+        // Fallback to direct RSS parsing for local development
+        const { fetchNewsForCategories } = await import('../lib/rss');
+        newsItems = await fetchNewsForCategories(categories);
+      }
       
       set({ 
         newsItems, 

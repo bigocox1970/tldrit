@@ -1,6 +1,4 @@
-const { createClient } = require('@supabase/supabase-js');
 const Parser = require('rss-parser');
-const fetch = require('node-fetch');
 
 const RSS_FEEDS = {
   technology: "https://www.theverge.com/rss/index.xml",
@@ -15,118 +13,186 @@ const RSS_FEEDS = {
   ai: "https://www.artificialintelligence-news.com/feed/",
 };
 
+// Function to extract image from content
+function extractImageFromContent(content) {
+  if (!content) return null;
+  
+  // Try to find img tags in content
+  const imgMatch = content.match(/<img[^>]+src="([^">]+)"/i);
+  if (imgMatch) {
+    return imgMatch[1];
+  }
+  
+  // Try to find image URLs in content
+  const urlMatch = content.match(/(https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp))/i);
+  if (urlMatch) {
+    return urlMatch[1];
+  }
+  
+  return null;
+}
+
+// Function to get a fallback image based on category
+function getCategoryImage(category) {
+  const categoryImages = {
+    technology: "https://images.unsplash.com/photo-1518709268805-4e9042af2176?w=400&h=200&fit=crop",
+    world: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=200&fit=crop",
+    business: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=200&fit=crop",
+    science: "https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=400&h=200&fit=crop",
+    crypto: "https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=400&h=200&fit=crop",
+    health: "https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=200&fit=crop",
+    entertainment: "https://images.unsplash.com/photo-1489599856641-b2d54d0b0b78?w=400&h=200&fit=crop",
+    sports: "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=400&h=200&fit=crop",
+    politics: "https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?w=400&h=200&fit=crop",
+    ai: "https://images.unsplash.com/photo-1677442136019-21780ecad995?w=400&h=200&fit=crop",
+  };
+  
+  return categoryImages[category] || "https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=400&h=200&fit=crop";
+}
+
 exports.handler = async function(event, context) {
-  const SUPABASE_URL = process.env.SUPABASE_URL;
-  const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
-  const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+  // Set CORS headers
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  };
 
-  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  const parser = new Parser();
-
-  // Get authorization header
-  const authHeader = event.headers.authorization;
-  if (!authHeader) {
+  // Handle preflight requests
+  if (event.httpMethod === 'OPTIONS') {
     return {
-      statusCode: 401,
-      body: JSON.stringify({ error: 'Authorization header required' }),
+      statusCode: 200,
+      headers,
+      body: '',
     };
   }
 
-  // Set the auth token for supabase
-  const token = authHeader.replace('Bearer ', '');
-  supabase.auth.setSession({ access_token: token, refresh_token: '' });
+  try {
+    const parser = new Parser({
+      customFields: {
+        item: [
+          ['media:content', 'mediaContent'],
+          ['media:thumbnail', 'mediaThumbnail'],
+          ['enclosure', 'enclosure'],
+          ['description', 'description'],
+          ['content:encoded', 'contentEncoded']
+        ]
+      }
+    });
 
-  // Get current user
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
-  if (userError || !user) {
-    return {
-      statusCode: 401,
-      body: JSON.stringify({ error: 'Invalid authentication' }),
-    };
-  }
-
-  // Get user's interests from profile
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('interests')
-    .eq('id', user.id)
-    .single();
-
-  if (profileError) {
-    console.error('Error fetching user profile:', profileError);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: 'Failed to fetch user profile' }),
-    };
-  }
-
-  // Use user's interests or default to general categories
-  const userInterests = profile?.interests && profile.interests.length > 0 
-    ? profile.interests 
-    : ["technology", "world", "business"];
-
-  const newsItems = [];
-  for (const interest of userInterests) {
-    if (RSS_FEEDS[interest]) {
+    // Parse request body to get categories
+    let categories = ['technology', 'world', 'business', 'science'];
+    if (event.body) {
       try {
-        const feed = await parser.parseURL(RSS_FEEDS[interest]);
-        for (const item of feed.items.slice(0, 5)) {
-          const summary = await summarizeArticle(item.content || item.description || "", OPENAI_API_KEY);
-          newsItems.push({
-            title: item.title,
-            source_url: item.link,
-            category: interest,
-            summary,
-            published_at: item.pubDate ? new Date(item.pubDate) : new Date(),
-            image_url: item.enclosure?.url || null,
-          });
+        const body = JSON.parse(event.body);
+        if (body.categories && Array.isArray(body.categories)) {
+          categories = body.categories;
         }
-      } catch (error) {
-        console.error(`Error fetching ${interest} feed:`, error);
+      } catch (e) {
+        console.log('Could not parse request body, using default categories');
       }
     }
-  }
 
-  if (newsItems.length > 0) {
-    await supabase
-      .from("news")
-      .upsert(newsItems, { onConflict: "source_url", ignoreDuplicates: true });
-  }
+    console.log('Fetching news for categories:', categories);
 
-  return {
-    statusCode: 200,
-    body: JSON.stringify({ success: true, count: newsItems.length }),
-  };
-};
+    const newsItems = [];
+    const promises = categories.map(async (category) => {
+      if (!RSS_FEEDS[category]) {
+        console.log(`No RSS feed found for category: ${category}`);
+        return;
+      }
 
-async function summarizeArticle(content, OPENAI_API_KEY) {
-  try {
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-3.5-turbo",
-        messages: [
-          {
-            role: "system",
-            content: "You are a professional news editor. Create concise, informative summaries that capture the key points while maintaining accuracy.",
-          },
-          {
-            role: "user",
-            content: `Summarize this article in about 100 words:\n\n${content}`,
-          },
-        ],
-        max_tokens: 150,
-        temperature: 0.7,
-      }),
+      try {
+        console.log(`Fetching RSS feed for ${category}: ${RSS_FEEDS[category]}`);
+        const feed = await parser.parseURL(RSS_FEEDS[category]);
+        
+        const items = feed.items.slice(0, 3).map((item, index) => {
+          // Extract image from multiple sources
+          let imageUrl = null;
+          
+          // Try enclosure first (common in RSS)
+          if (item.enclosure && item.enclosure.url) {
+            imageUrl = item.enclosure.url;
+          }
+          // Try media content
+          else if (item.mediaContent && item.mediaContent.$) {
+            imageUrl = item.mediaContent.$.url;
+          }
+          // Try media thumbnail
+          else if (item.mediaThumbnail && item.mediaThumbnail.$) {
+            imageUrl = item.mediaThumbnail.$.url;
+          }
+          // Try to extract from content
+          else if (item.contentEncoded) {
+            imageUrl = extractImageFromContent(item.contentEncoded);
+          }
+          else if (item.content) {
+            imageUrl = extractImageFromContent(item.content);
+          }
+          else if (item.description) {
+            imageUrl = extractImageFromContent(item.description);
+          }
+          
+          // Use category fallback image if no image found
+          if (!imageUrl) {
+            imageUrl = getCategoryImage(category);
+          }
+
+          // Clean up description for summary
+          let summary = item.description || item.content || item.contentEncoded || '';
+          // Remove HTML tags
+          summary = summary.replace(/<[^>]*>/g, '');
+          // Limit length
+          if (summary.length > 300) {
+            summary = summary.substring(0, 300) + '...';
+          }
+
+          return {
+            id: `${category}-${index}-${Date.now()}`,
+            title: item.title || 'No title',
+            summary: summary || 'No summary available',
+            sourceUrl: item.link || '',
+            category: category,
+            publishedAt: item.pubDate ? new Date(item.pubDate).toISOString() : new Date().toISOString(),
+            imageUrl: imageUrl,
+            audioUrl: null,
+            tldr: null
+          };
+        });
+
+        newsItems.push(...items);
+      } catch (error) {
+        console.error(`Error fetching ${category} feed:`, error);
+      }
     });
-    const data = await response.json();
-    return data.choices[0].message.content.trim();
+
+    await Promise.all(promises);
+
+    // Sort by published date (newest first)
+    newsItems.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+
+    console.log(`Successfully fetched ${newsItems.length} news items`);
+
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({
+        success: true,
+        newsItems: newsItems,
+        count: newsItems.length
+      }),
+    };
+
   } catch (error) {
-    console.error("Error summarizing article:", error);
-    return content.slice(0, 200) + "...";
+    console.error('Error in fetch-news function:', error);
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({
+        success: false,
+        error: 'Failed to fetch news',
+        details: error.message
+      }),
+    };
   }
-}
+};
