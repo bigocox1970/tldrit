@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, Moon, Search, Sun, X, User } from 'lucide-react';
+import { Menu, Moon, Sun, X, User } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import Button from '../ui/Button';
 
@@ -12,17 +12,11 @@ interface HeaderProps {
 const Header: React.FC<HeaderProps> = ({ isDarkMode, toggleDarkMode }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAuthenticated, logout } = useAuthStore();
+  const { isAuthenticated } = useAuthStore();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
-  };
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log('Searching for:', searchQuery);
   };
 
   const getPageTitle = () => {
@@ -76,17 +70,6 @@ const Header: React.FC<HeaderProps> = ({ isDarkMode, toggleDarkMode }) => {
 
           {/* Search and actions */}
           <div className="hidden md:flex items-center space-x-4">
-            <form onSubmit={handleSearch} className="relative">
-              <input
-                type="text"
-                placeholder="Search or paste URL..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-64 pl-10 pr-4 py-2 rounded-full border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-            </form>
-
             <div className="flex items-center space-x-2">
               <button
                 type="button"
@@ -95,7 +78,6 @@ const Header: React.FC<HeaderProps> = ({ isDarkMode, toggleDarkMode }) => {
               >
                 {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
               </button>
-
               <button
                 type="button"
                 onClick={() => navigate('/profile')}
@@ -103,16 +85,7 @@ const Header: React.FC<HeaderProps> = ({ isDarkMode, toggleDarkMode }) => {
               >
                 <User size={20} />
               </button>
-
-              {isAuthenticated ? (
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => logout()}
-                >
-                  Sign Out
-                </Button>
-              ) : (
+              {!isAuthenticated && (
                 <Link to="/login">
                   <Button variant="primary" size="sm">
                     Sign In
@@ -131,7 +104,6 @@ const Header: React.FC<HeaderProps> = ({ isDarkMode, toggleDarkMode }) => {
             >
               {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
             </button>
-
             <button
               type="button"
               onClick={() => navigate('/profile')}
@@ -146,27 +118,8 @@ const Header: React.FC<HeaderProps> = ({ isDarkMode, toggleDarkMode }) => {
       {/* Mobile menu */}
       {isMenuOpen && (
         <div className="md:hidden bg-white dark:bg-gray-900 shadow-lg py-2 px-4">
-          <form onSubmit={handleSearch} className="relative mb-4">
-            <input
-              type="text"
-              placeholder="Search or paste URL..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 rounded-full border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-          </form>
-          
           <div className="space-y-2">
-            {isAuthenticated ? (
-              <Button 
-                variant="outline" 
-                fullWidth
-                onClick={() => logout()}
-              >
-                Sign Out
-              </Button>
-            ) : (
+            {!isAuthenticated ? (
               <div className="space-y-2">
                 <Link to="/login" onClick={() => setIsMenuOpen(false)}>
                   <Button variant="primary" fullWidth>
@@ -179,7 +132,7 @@ const Header: React.FC<HeaderProps> = ({ isDarkMode, toggleDarkMode }) => {
                   </Button>
                 </Link>
               </div>
-            )}
+            ) : null}
           </div>
         </div>
       )}

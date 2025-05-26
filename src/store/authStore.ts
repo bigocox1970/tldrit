@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { User } from '../types';
 import { getCurrentUser, signIn, signOut, signUp } from '../lib/supabase';
 
@@ -13,121 +14,138 @@ interface AuthState {
   checkAuthState: () => Promise<void>;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
-  user: null,
-  isLoading: true,
-  error: null,
-  isAuthenticated: false,
-  
-  login: async (email: string, password: string) => {
-    set({ isLoading: true, error: null });
-    try {
-      const { data, error } = await signIn(email, password);
+export const useAuthStore = create<AuthState>()(
+  persist<AuthState>(
+    (set) => ({
+      user: null,
+      isLoading: true,
+      error: null,
+      isAuthenticated: false,
       
-      if (error) {
-        set({ error: error.message, isLoading: false, isAuthenticated: false });
-        return;
-      }
+      login: async (email: string, password: string) => {
+        set({ isLoading: true, error: null });
+        try {
+          const { data, error } = await signIn(email, password);
+          
+          if (error) {
+            set({ error: error.message, isLoading: false, isAuthenticated: false });
+            return;
+          }
+          
+          if (data?.user) {
+            const { user } = await getCurrentUser();
+            set({ 
+              user: user ? { ...user, email: user.email || '' } : null, 
+              isAuthenticated: true, 
+              isLoading: false, 
+              error: null 
+            });
+          }
+        } catch {
+          set({ 
+            error: 'An error occurred during login', 
+            isLoading: false,
+            isAuthenticated: false 
+          });
+        }
+      },
       
-      if (data?.user) {
-        const { user } = await getCurrentUser();
-        set({ 
-          user, 
-          isAuthenticated: true, 
-          isLoading: false, 
-          error: null 
-        });
-      }
-    } catch (err) {
-      set({ 
-        error: 'An error occurred during login', 
+      register: async (email: string, password: string) => {
+        set({ isLoading: true, error: null });
+        try {
+          const { data, error } = await signUp(email, password);
+          
+          if (error) {
+            set({ error: error.message, isLoading: false });
+            return;
+          }
+          
+          if (data?.user) {
+            // Auto-login after successful registration
+            await signIn(email, password);
+            const { user } = await getCurrentUser();
+            set({ 
+              user: user ? { ...user, email: user.email || '' } : null, 
+              isAuthenticated: true, 
+              isLoading: false, 
+              error: null 
+            });
+          }
+        } catch {
+          set({ 
+            error: 'An error occurred during registration', 
+            isLoading: false 
+          });
+        }
+      },
+      
+      logout: async () => {
+        set({ isLoading: true });
+        try {
+          const { error } = await signOut();
+          
+          if (error) {
+            set({ error: error.message, isLoading: false });
+            return;
+          }
+          
+          set({ 
+            user: null, 
+            isAuthenticated: false, 
+            isLoading: false, 
+            error: null 
+          });
+        } catch {
+          set({ 
+            error: 'An error occurred during logout', 
+            isLoading: false 
+          });
+        }
+      },
+      
+      checkAuthState: async () => {
+        set({ isLoading: true });
+        try {
+          const { user, error } = await getCurrentUser();
+          
+          if (error || !user) {
+            set({ 
+              user: null, 
+              isAuthenticated: false, 
+              isLoading: false, 
+              error: error?.message || null 
+            });
+            return;
+          }
+          
+          set({ 
+            user: user ? { ...user, email: user.email || '' } : null, 
+            isAuthenticated: true, 
+            isLoading: false, 
+            error: null 
+          });
+        } catch {
+          set({ 
+            user: null, 
+            isAuthenticated: false, 
+            isLoading: false, 
+            error: 'Failed to get authentication state' 
+          });
+        }
+      },
+    }),
+    {
+      name: 'auth-storage',
+      partialize: (state) => ({
+        user: state.user,
+        isAuthenticated: state.isAuthenticated,
+        error: state.error,
         isLoading: false,
-        isAuthenticated: false 
-      });
+        login: async () => {},
+        register: async () => {},
+        logout: async () => {},
+        checkAuthState: async () => {},
+      }),
     }
-  },
-  
-  register: async (email: string, password: string) => {
-    set({ isLoading: true, error: null });
-    try {
-      const { data, error } = await signUp(email, password);
-      
-      if (error) {
-        set({ error: error.message, isLoading: false });
-        return;
-      }
-      
-      if (data?.user) {
-        // Auto-login after successful registration
-        await signIn(email, password);
-        const { user } = await getCurrentUser();
-        set({ 
-          user, 
-          isAuthenticated: true, 
-          isLoading: false, 
-          error: null 
-        });
-      }
-    } catch (err) {
-      set({ 
-        error: 'An error occurred during registration', 
-        isLoading: false 
-      });
-    }
-  },
-  
-  logout: async () => {
-    set({ isLoading: true });
-    try {
-      const { error } = await signOut();
-      
-      if (error) {
-        set({ error: error.message, isLoading: false });
-        return;
-      }
-      
-      set({ 
-        user: null, 
-        isAuthenticated: false, 
-        isLoading: false, 
-        error: null 
-      });
-    } catch (err) {
-      set({ 
-        error: 'An error occurred during logout', 
-        isLoading: false 
-      });
-    }
-  },
-  
-  checkAuthState: async () => {
-    set({ isLoading: true });
-    try {
-      const { user, error } = await getCurrentUser();
-      
-      if (error || !user) {
-        set({ 
-          user: null, 
-          isAuthenticated: false, 
-          isLoading: false, 
-          error: error?.message || null 
-        });
-        return;
-      }
-      
-      set({ 
-        user, 
-        isAuthenticated: true, 
-        isLoading: false, 
-        error: null 
-      });
-    } catch (err) {
-      set({ 
-        user: null, 
-        isAuthenticated: false, 
-        isLoading: false, 
-        error: 'Failed to get authentication state' 
-      });
-    }
-  },
-}));
+  )
+);
