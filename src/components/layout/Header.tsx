@@ -1,8 +1,6 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Moon, Sun, User } from 'lucide-react';
-import { useAuthStore } from '../../store/authStore';
-import Button from '../ui/Button';
 
 interface HeaderProps {
   isDarkMode: boolean;
@@ -12,7 +10,6 @@ interface HeaderProps {
 const Header: React.FC<HeaderProps> = ({ isDarkMode, toggleDarkMode }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAuthenticated } = useAuthStore();
 
   const getPageTitle = () => {
     switch (location.pathname) {
@@ -45,7 +42,7 @@ const Header: React.FC<HeaderProps> = ({ isDarkMode, toggleDarkMode }) => {
           <div className="flex items-center">
             <Link to="/" className="flex items-center">
               <span className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-red-500 to-yellow-500">
-                TLDRit
+                TLDR<em>it</em>
               </span>
             </Link>
           </div>
@@ -72,13 +69,6 @@ const Header: React.FC<HeaderProps> = ({ isDarkMode, toggleDarkMode }) => {
               >
                 <User size={20} />
               </button>
-              {!isAuthenticated && (
-                <Link to="/login">
-                  <Button variant="primary" size="sm">
-                    Sign In
-                  </Button>
-                </Link>
-              )}
             </div>
           </div>
 

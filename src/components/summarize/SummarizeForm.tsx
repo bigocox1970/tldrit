@@ -21,6 +21,7 @@ const SummarizeForm: React.FC = () => {
   const [error, setError] = useState('');
   const [showOverlay, setShowOverlay] = useState(false);
   const [regenerateHighlight, setRegenerateHighlight] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
   // Track the last toggled ELI5 value to trigger summary lookup
   const [pendingEli5Toggle, setPendingEli5Toggle] = useState<null | boolean>(null);
   
@@ -127,6 +128,46 @@ const SummarizeForm: React.FC = () => {
       setError('');
     }
   };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+
+    const files = e.dataTransfer.files;
+    if (files && files[0]) {
+      const selectedFile = files[0];
+      
+      // Check file type
+      const allowedTypes = ['.txt', '.pdf', '.doc', '.docx'];
+      const fileExtension = '.' + selectedFile.name.split('.').pop()?.toLowerCase();
+      
+      if (!allowedTypes.includes(fileExtension)) {
+        setError('Please upload a valid file type: PDF, DOCX, or TXT');
+        return;
+      }
+      
+      if (!user?.isPremium && selectedFile.size > 5 * 1024 * 1024) {
+        setError('Free accounts are limited to 5MB files. Upgrade to process larger files.');
+        return;
+      }
+      
+      setFile(selectedFile);
+      setError('');
+    }
+  };
   
   const handleSliderChange = (level: number) => {
     setSummaryLevel(level);
@@ -205,7 +246,16 @@ const SummarizeForm: React.FC = () => {
         );
       case 'file':
         return (
-          <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center">
+          <div 
+            className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+              isDragOver 
+                ? 'border-blue-400 bg-blue-50 dark:bg-blue-900/20' 
+                : 'border-gray-300 dark:border-gray-600'
+            }`}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
             <input
               type="file"
               id="file-upload"
@@ -231,11 +281,13 @@ const SummarizeForm: React.FC = () => {
             ) : (
               <label
                 htmlFor="file-upload"
-                className="cursor-pointer"
+                className="cursor-pointer block"
               >
                 <div className="flex flex-col items-center justify-center">
-                  <File size={36} className="text-gray-400 mb-2" />
-                  <p className="text-lg font-medium mb-1">Drop file here or click to upload</p>
+                  <File size={36} className={`mb-2 ${isDragOver ? 'text-blue-500' : 'text-gray-400'}`} />
+                  <p className={`text-lg font-medium mb-1 ${isDragOver ? 'text-blue-700 dark:text-blue-300' : ''}`}>
+                    {isDragOver ? 'Drop file here!' : 'Drop file here or click to upload'}
+                  </p>
                   <p className="text-sm text-gray-500 dark:text-gray-400">
                     Supports PDF, DOCX, TXT (max {user?.isPremium ? '20MB' : '5MB'})
                   </p>
