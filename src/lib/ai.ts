@@ -90,7 +90,7 @@ export async function generateAudio(text: string, isPremium: boolean) {
   }
 
   try {
-    const response = await axios.post('/.netlify/functions/text-to-speech', {
+    const response = await axios.post('/api/text-to-speech', {
       text,
       isPremium,
     }, {
@@ -146,7 +146,7 @@ export async function processFileContent(file: File) {
   formData.append('file', file);
   
   try {
-    const response = await axios.post('/.netlify/functions/process-file', formData, {
+    const response = await axios.post('/api/process-file', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
