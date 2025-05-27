@@ -14,6 +14,7 @@ const SavedPage: React.FC = () => {
   const { summaries, fetchSummaries, isLoading, generateAudioForSummary } = useSummaryStore();
   const [selectedSummary, setSelectedSummary] = useState<string | null>(null);
   const [audioLoading, setAudioLoading] = useState<{ [id: string]: boolean }>({});
+  const [audioPlaying, setAudioPlaying] = useState<{ [id: string]: boolean }>({});
   const audioRefs = React.useRef<{ [id: string]: HTMLAudioElement | null }>({});
   
   useEffect(() => {
@@ -26,23 +27,55 @@ const SavedPage: React.FC = () => {
     setSelectedSummary(summaryId === selectedSummary ? null : summaryId);
   };
   
+  useEffect(() => {
+    // Cleanup audio instances on unmount
+    return () => {
+      Object.values(audioRefs.current).forEach(audio => {
+        if (audio) {
+          audio.pause();
+          audio.currentTime = 0;
+        }
+      });
+    };
+  }, []);
+
   const handleSpeakerClick = async (summary: Summary, e: React.MouseEvent) => {
     e.stopPropagation();
+    
+    // Stop any currently playing audio
+    Object.entries(audioRefs.current).forEach(([id, audio]) => {
+      if (audio && id !== summary.id) {
+        audio.pause();
+        audio.currentTime = 0;
+        setAudioPlaying(prev => ({ ...prev, [id]: false }));
+      }
+    });
+
     if (summary.audioUrl) {
-      // Play audio
+      // Initialize audio if not already done
       if (!audioRefs.current[summary.id]) {
         audioRefs.current[summary.id] = new Audio(summary.audioUrl);
         audioRefs.current[summary.id]?.addEventListener('ended', () => {
-          // setAudioPlaying((prev) => ({ ...prev, [summary.id]: false }));
+          setAudioPlaying(prev => ({ ...prev, [summary.id]: false }));
         });
       }
-      // setAudioPlaying((prev) => ({ ...prev, [summary.id]: true }));
-      audioRefs.current[summary.id]?.play();
+
+      // Toggle play/pause
+      if (audioPlaying[summary.id]) {
+        audioRefs.current[summary.id]?.pause();
+        setAudioPlaying(prev => ({ ...prev, [summary.id]: false }));
+      } else {
+        audioRefs.current[summary.id]?.play();
+        setAudioPlaying(prev => ({ ...prev, [summary.id]: true }));
+      }
     } else {
       // Generate audio
-      setAudioLoading((prev) => ({ ...prev, [summary.id]: true }));
-      await generateAudioForSummary(summary.id);
-      setAudioLoading((prev) => ({ ...prev, [summary.id]: false }));
+      setAudioLoading(prev => ({ ...prev, [summary.id]: true }));
+      try {
+        await generateAudioForSummary(summary.id);
+      } finally {
+        setAudioLoading(prev => ({ ...prev, [summary.id]: false }));
+      }
     }
   };
   
@@ -132,25 +165,42 @@ const SavedPage: React.FC = () => {
                 <span>
                   {summary.isEli5 ? 'ELI5' : `Level ${summary.summaryLevel}`}
                 </span>
-                <button
-                  onClick={(e) => handleSpeakerClick(summary, e)}
-                  className={`ml-2 p-2 rounded-full transition-colors border border-gray-200 dark:border-gray-700
-                    ${audioLoading[summary.id] ? 'animate-pulse bg-green-200' : summary.audioUrl ? 'bg-green-500' : 'bg-gray-200 dark:bg-gray-700'}
-                  `}
-                  title={summary.audioUrl ? 'Play audio' : 'Generate audio'}
-                  disabled={audioLoading[summary.id]}
-                >
-                  <Volume2
-                    size={20}
-                    className={
+                  <button
+                    onClick={(e) => handleSpeakerClick(summary, e)}
+                    className={`ml-2 p-2 rounded-full transition-colors border border-gray-200 dark:border-gray-700
+                      ${audioLoading[summary.id] 
+                        ? 'animate-pulse bg-green-200' 
+                        : audioPlaying[summary.id]
+                        ? 'bg-green-600'
+                        : summary.audioUrl 
+                        ? 'bg-green-500' 
+                        : 'bg-gray-200 dark:bg-gray-700'
+                      }
+                    `}
+                    title={
                       audioLoading[summary.id]
-                        ? 'text-green-700'
+                        ? 'Generating audio...'
+                        : audioPlaying[summary.id]
+                        ? 'Pause audio'
                         : summary.audioUrl
-                        ? 'text-white'
-                        : 'text-gray-500 dark:text-gray-400'
+                        ? 'Play audio'
+                        : 'Generate audio'
                     }
-                  />
-                </button>
+                    disabled={audioLoading[summary.id]}
+                  >
+                    <Volume2
+                      size={20}
+                      className={
+                        audioLoading[summary.id]
+                          ? 'text-green-700'
+                          : audioPlaying[summary.id]
+                          ? 'text-white animate-pulse'
+                          : summary.audioUrl
+                          ? 'text-white'
+                          : 'text-gray-500 dark:text-gray-400'
+                      }
+                    />
+                  </button>
               </div>
             </CardContent>
           </Card>

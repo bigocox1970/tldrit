@@ -10,7 +10,7 @@
  * 
  * PROXY CONFIGURATION:
  * - /api/extract-url → Supabase function (URL content extraction)
- * - /api/text-to-speech → Supabase function (audio generation)
+ * - /api/text-to-speech → Netlify function (audio generation)
  * - /api/process-file → Production Netlify function (PDF/file processing)
  * - /api/rss-proxy → Production Netlify function (RSS proxy for CORS)
  * 
@@ -30,11 +30,13 @@ export default defineConfig(({ mode }) => {
   const supabaseUrl = env.VITE_SUPABASE_URL;
 
   return {
+    base: '/',
+    publicDir: 'public',
     plugins: [
       react(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'robots.txt'],
+        includeAssets: ['tldrit-favicon.png', 'TLDRit-icon.png', 'TLDRit-logo.png'],
         manifest: {
           name: 'TLDRit - AI Summarization',
           short_name: 'TLDRit',
@@ -42,17 +44,17 @@ export default defineConfig(({ mode }) => {
           theme_color: '#4285F4',
           icons: [
             {
-              src: '/pwa-192x192.png',
+              src: '/TLDRit-icon.png',
               sizes: '192x192',
               type: 'image/png'
             },
             {
-              src: '/pwa-512x512.png',
+              src: '/TLDRit-icon.png',
               sizes: '512x512',
               type: 'image/png'
             },
             {
-              src: '/pwa-512x512.png',
+              src: '/TLDRit-icon.png',
               sizes: '512x512',
               type: 'image/png',
               purpose: 'any maskable'
@@ -84,9 +86,9 @@ export default defineConfig(({ mode }) => {
           }
         },
         '/api/text-to-speech': {
-          target: supabaseUrl,
+          target: 'https://tldrit.netlify.app',
           changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api/, '/functions/v1'),
+          rewrite: (path) => path.replace(/^\/api/, '/.netlify/functions'),
           configure: (proxy) => {
             proxy.on('error', (err) => {
               console.log('proxy error', err);

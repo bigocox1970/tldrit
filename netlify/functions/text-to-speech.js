@@ -112,15 +112,30 @@ exports.handler = async function(event, context) {
     // Get the audio data
     const audioBuffer = await response.buffer();
     
-    // Convert to base64 for returning (in a real app, you'd upload to storage)
-    const audioBase64 = audioBuffer.toString('base64');
-    const audioUrl = `data:audio/mp3;base64,${audioBase64}`;
+    // Upload audio to Supabase storage
+    const fileName = `audio/${user.id}/${Date.now()}.mp3`;
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('tldrit')
+      .upload(fileName, audioBuffer, {
+        contentType: 'audio/mp3',
+        cacheControl: '3600',
+        upsert: false
+      });
+
+    if (uploadError) {
+      throw new Error(`Storage upload error: ${uploadError.message}`);
+    }
+
+    // Get public URL for the uploaded file
+    const { data: { publicUrl } } = supabase.storage
+      .from('tldrit')
+      .getPublicUrl(fileName);
 
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({
-        audioUrl,
+        audioUrl: publicUrl,
       }),
     };
 
