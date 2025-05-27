@@ -14,23 +14,71 @@ const dynamicTexts = [
   'Oh, and ANY webpage!',
 ];
 
+const HERO_SPECIAL = 'Oh, and ANY webpage!';
+
 const HeroSection: React.FC = () => {
   const { isAuthenticated } = useAuthStore();
   const [currentTextIndex, setCurrentTextIndex] = useState(0);
+  // Animation state for the special step
+  const [ohStep, setOhStep] = useState(0); // 0: Oh, 1: dots, 2: reveal rest
+  const [dotCount, setDotCount] = useState(1);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    if (dynamicTexts[currentTextIndex] === 'Oh, and ANY webpage!') {
-      interval = setTimeout(() => {
-        setCurrentTextIndex(0);
-      }, 3500);
+    if (dynamicTexts[currentTextIndex] === HERO_SPECIAL) {
+      if (ohStep === 0) {
+        // After 500ms, start animating dots
+        interval = setTimeout(() => setOhStep(1), 500);
+      } else if (ohStep === 1) {
+        // Animate dots: '.', '..', '...'
+        if (dotCount < 3) {
+          interval = setTimeout(() => setDotCount(dotCount + 1), 250);
+        } else {
+          // After a pause, reveal the rest
+          interval = setTimeout(() => setOhStep(2), 600);
+        }
+      } else if (ohStep === 2) {
+        // After a pause, reset to first text
+        interval = setTimeout(() => {
+          setCurrentTextIndex(0);
+          setOhStep(0);
+          setDotCount(1);
+        }, 2500);
+      }
     } else {
       interval = setTimeout(() => {
         setCurrentTextIndex((i) => i + 1);
       }, 1800);
     }
     return () => clearTimeout(interval);
-  }, [currentTextIndex]);
+  }, [currentTextIndex, ohStep, dotCount]);
+
+  // Helper for the special animation
+  const renderSpecialScroller = () => {
+    if (ohStep === 0) {
+      return (
+        <span>
+          <span className="text-white font-extrabold">Oh,</span>
+        </span>
+      );
+    } else if (ohStep === 1) {
+      return (
+        <span>
+          <span className="text-white font-extrabold">Oh,</span>
+          <span className="inline-block w-8 text-white animate-pulse">{' '.repeat(1)}{'.'.repeat(dotCount)}</span>
+        </span>
+      );
+    } else {
+      // Reveal the rest
+      return (
+        <span>
+          <span className="text-white font-extrabold">Oh,</span>
+          <span className="inline-block w-8 text-white">...</span>
+          <span className="ml-2">and <span className="text-white font-extrabold">ANY</span> webpage</span>
+        </span>
+      );
+    }
+  };
 
   return (
     <div className="py-2 px-4 sm:px-6 text-center flex flex-col items-center justify-center min-h-[40vh]">
@@ -43,13 +91,13 @@ const HeroSection: React.FC = () => {
         Fast AI powered summaries
       </h1>
       <h2 className="text-3xl sm:text-4xl font-bold mb-4 min-h-[2.5em]">
-        {dynamicTexts[currentTextIndex] === 'Oh, and ANY webpage!' ? (
-          <span className="inline-block transition-all duration-500 ease-in-out font-extrabold bg-gradient-to-r from-pink-500 via-yellow-400 to-blue-500 bg-clip-text text-transparent">
-            {dynamicTexts[currentTextIndex]}
+        {dynamicTexts[currentTextIndex] === HERO_SPECIAL ? (
+          <span className="inline-block transition-all duration-500 ease-in-out">
+            {renderSpecialScroller()}
           </span>
         ) : (
           <>
-            TLDR{' '}
+            <span className="text-white font-extrabold">TLDR</span>{' '}
             <span className="inline-block transition-all duration-500 ease-in-out text-blue-600 dark:text-blue-400">
               {dynamicTexts[currentTextIndex]}
             </span>
