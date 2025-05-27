@@ -1,15 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNewsStore } from '../../store/newsStore';
 import Card, { CardContent } from '../ui/Card';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, FileText } from 'lucide-react';
 
 const NewsCarousel: React.FC = () => {
-  const { newsItems, fetchNewsItems, isLoading } = useNewsStore();
+  const { newsItems, fetchNewsItems, isLoading, generateTLDRForNewsItem } = useNewsStore();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
   const [displayIndex, setDisplayIndex] = useState(0);
   const touchStartX = useRef<number | null>(null);
   const touchEndX = useRef<number | null>(null);
+  const [tldrVisible, setTldrVisible] = useState<{ [id: string]: boolean }>({});
 
   useEffect(() => {
     fetchNewsItems();
@@ -99,38 +100,59 @@ const NewsCarousel: React.FC = () => {
         >
           <Card className="cursor-pointer hover:border-blue-300 border border-gray-200 dark:border-gray-700 transition-all px-2 py-2 sm:px-4 sm:py-3">
             <CardContent>
-              {news.imageUrl && (
-                <div className="w-full h-40 overflow-hidden rounded-md mb-3">
-                  <img
-                    src={news.imageUrl}
-                    alt={news.title}
-                    className="w-full h-full object-cover"
-                    onError={e => (e.currentTarget.style.display = 'none')}
-                  />
+              <div className="flex items-center gap-4">
+                {news.imageUrl && (
+                  <div className="flex-shrink-0 w-20 h-20 rounded-md overflow-hidden bg-gray-100">
+                    <img
+                      src={news.imageUrl}
+                      alt={news.title}
+                      className="w-full h-full object-cover"
+                      onError={e => (e.currentTarget.style.display = 'none')}
+                    />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-medium text-lg mb-1 line-clamp-1">
+                    {news.title}
+                  </h3>
+                  <p className="text-gray-600 dark:text-gray-400 line-clamp-2 text-sm mb-2">
+                    {news.summary}
+                  </p>
+                  <div className="flex justify-between items-center mt-2 text-xs text-gray-500 dark:text-gray-400">
+                    <span>
+                      {new Date(news.publishedAt).toLocaleDateString()}
+                    </span>
+                    <span>
+                      {news.category}
+                    </span>
+                  </div>
+                  <a
+                    href={news.sourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block mt-2 text-blue-600 dark:text-blue-400 hover:underline text-sm"
+                  >
+                    Read Full Article →
+                  </a>
+                  <button
+                    className="mt-2 flex items-center gap-1 px-3 py-1 rounded bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition"
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (!news.tldr) {
+                        await generateTLDRForNewsItem(news.id);
+                      }
+                      setTldrVisible(v => ({ ...v, [news.id]: !v[news.id] }));
+                    }}
+                  >
+                    <FileText size={16} /> TLDR
+                  </button>
+                  {tldrVisible[news.id] && news.tldr && (
+                    <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800 text-sm text-gray-800 dark:text-gray-200">
+                      {news.tldr}
+                    </div>
+                  )}
                 </div>
-              )}
-              <h3 className="font-medium text-lg mb-1 line-clamp-1">
-                {news.title}
-              </h3>
-              <p className="text-gray-600 dark:text-gray-400 line-clamp-2 text-sm mb-2">
-                {news.summary}
-              </p>
-              <div className="flex justify-between items-center mt-2 text-xs text-gray-500 dark:text-gray-400">
-                <span>
-                  {new Date(news.publishedAt).toLocaleDateString()}
-                </span>
-                <span>
-                  {news.category}
-                </span>
               </div>
-              <a
-                href={news.sourceUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block mt-2 text-blue-600 dark:text-blue-400 hover:underline text-sm"
-              >
-                Read Full Article →
-              </a>
             </CardContent>
           </Card>
         </div>

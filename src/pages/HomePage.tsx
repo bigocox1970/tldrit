@@ -11,9 +11,9 @@ const HomePage: React.FC = () => {
   return (
     <div>
       <HeroSection />
+      <FeatureSection />
       <NewsCarousel />
       {isAuthenticated && <RecentSummaries />}
-      <FeatureSection />
     </div>
   );
 };
