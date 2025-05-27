@@ -24,7 +24,7 @@ const SavedPage: React.FC = () => {
   if (!isAuthenticated) {
     return (
       <div>
-        <h1 className="text-2xl font-bold mb-6">Saved TL;DRs</h1>
+        {/* <h1 className="text-2xl font-bold mb-6">Saved TL;DRs</h1> */}
         
         <Card>
           <CardContent className="text-center py-8">
@@ -46,7 +46,7 @@ const SavedPage: React.FC = () => {
   if (isLoading && summaries.length === 0) {
     return (
       <div>
-        <h1 className="text-2xl font-bold mb-6">Saved TL;DRs</h1>
+        {/* <h1 className="text-2xl font-bold mb-6">Saved TL;DRs</h1> */}
         <p>Loading saved TL;DRs...</p>
       </div>
     );
@@ -55,7 +55,7 @@ const SavedPage: React.FC = () => {
   if (summaries.length === 0) {
     return (
       <div>
-        <h1 className="text-2xl font-bold mb-6">Saved TL;DRs</h1>
+        {/* <h1 className="text-2xl font-bold mb-6">Saved TL;DRs</h1> */}
         
         <Card>
           <CardContent className="text-center py-8">
@@ -76,7 +76,7 @@ const SavedPage: React.FC = () => {
   
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">Saved TL;DRs</h1>
+      {/* <h1 className="text-2xl font-bold mb-6">Saved TL;DRs</h1> */}
       
       <div className="space-y-4">
         {summaries.map((summary) => (

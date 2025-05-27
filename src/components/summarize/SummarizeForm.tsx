@@ -217,90 +217,6 @@ const SummarizeForm: React.FC = () => {
     });
   };
   
-  const renderInputField = () => {
-    switch (inputType) {
-      case 'text':
-        return (
-          <textarea
-            ref={textareaRef}
-            value={content}
-            onChange={e => {
-              setContent(e.target.value);
-              if (textareaRef.current) {
-                textareaRef.current.style.height = 'auto';
-                textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
-              }
-            }}
-            className="w-full p-4 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none overflow-auto"
-            placeholder="Paste your text here..."
-          />
-        );
-      case 'url':
-        return (
-          <Input
-            type="url"
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="Enter URL to summarize..."
-          />
-        );
-      case 'file':
-        return (
-          <div 
-            className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
-              isDragOver 
-                ? 'border-blue-400 bg-blue-50 dark:bg-blue-900/20' 
-                : 'border-gray-300 dark:border-gray-600'
-            }`}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-          >
-            <input
-              type="file"
-              id="file-upload"
-              onChange={handleFileChange}
-              className="hidden"
-              accept=".txt,.pdf,.doc,.docx"
-            />
-            
-            {file ? (
-              <div>
-                <p className="mb-2 text-sm text-gray-600 dark:text-gray-400">
-                  Selected file:
-                </p>
-                <p className="font-medium">{file.name}</p>
-                <button
-                  type="button"
-                  onClick={() => setFile(null)}
-                  className="mt-2 text-sm text-red-600 dark:text-red-400 hover:underline"
-                >
-                  Remove
-                </button>
-              </div>
-            ) : (
-              <label
-                htmlFor="file-upload"
-                className="cursor-pointer block"
-              >
-                <div className="flex flex-col items-center justify-center">
-                  <File size={36} className={`mb-2 ${isDragOver ? 'text-blue-500' : 'text-gray-400'}`} />
-                  <p className={`text-lg font-medium mb-1 ${isDragOver ? 'text-blue-700 dark:text-blue-300' : ''}`}>
-                    {isDragOver ? 'Drop file here!' : 'Drop file here or click to upload'}
-                  </p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Supports PDF, DOCX, TXT (max {user?.isPremium ? '20MB' : '5MB'})
-                  </p>
-                </div>
-              </label>
-            )}
-          </div>
-        );
-      default:
-        return null;
-    }
-  };
-  
   return (
     <div className="relative">
       <Card>
@@ -326,7 +242,7 @@ const SummarizeForm: React.FC = () => {
             </div>
           )}
           
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6 flex flex-col h-[70vh] min-h-[400px]">
             <div className="flex border border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden">
               <button
                 type="button"
@@ -356,26 +272,92 @@ const SummarizeForm: React.FC = () => {
                   <span>URL</span>
                 </div>
               </button>
-              <button
-                type="button"
-                onClick={() => setInputType('file')}
-                className={`flex-1 py-2 ${
-                  inputType === 'file'
-                    ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium'
-                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'
+            </div>
+            <div className="flex-1 flex flex-col min-h-0">
+              {inputType === 'text' && (
+                <textarea
+                  ref={textareaRef}
+                  value={content}
+                  onChange={e => {
+                    setContent(e.target.value);
+                    if (textareaRef.current) {
+                      textareaRef.current.style.height = 'auto';
+                      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+                    }
+                  }}
+                  className="w-full flex-1 p-4 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none overflow-auto min-h-[120px] max-h-none"
+                  style={{ minHeight: '120px', height: '100%', maxHeight: 'none' }}
+                  placeholder={`🚀 Get straight to the point!
+
+Paste your ISO documents, British Standards, revision notes, meeting minutes, or any long text below.
+
+💡 Example:
+ISO 9001:2015 Quality management systems — Requirements...
+
+👇 Drop your text here and hit TL;DR it!`}
+                />
+              )}
+              {inputType === 'url' && (
+                <Input
+                  type="url"
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  placeholder="Enter URL to summarize..."
+                />
+              )}
+            </div>
+            {/* Always show drop file card below input */}
+            <div className="mt-4 flex-1 flex flex-col justify-end">
+              <div 
+                className={`border-4 border-dashed rounded-2xl p-12 text-center transition-colors shadow-lg bg-white/70 dark:bg-gray-900/70 ${
+                  isDragOver 
+                    ? 'border-blue-400 bg-blue-50 dark:bg-blue-900/20' 
+                    : 'border-gray-300 dark:border-gray-600'
                 }`}
+                style={{ minHeight: '180px' }}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
               >
-                <div className="flex items-center justify-center">
-                  <File size={16} className="mr-2" />
-                  <span>File</span>
-                </div>
-              </button>
+                <input
+                  type="file"
+                  id="file-upload"
+                  onChange={handleFileChange}
+                  className="hidden"
+                  accept=".txt,.pdf,.doc,.docx"
+                />
+                {file ? (
+                  <div>
+                    <p className="mb-2 text-lg text-gray-600 dark:text-gray-400">
+                      Selected file:
+                    </p>
+                    <p className="font-medium text-lg">{file.name}</p>
+                    <button
+                      type="button"
+                      onClick={() => setFile(null)}
+                      className="mt-2 text-base text-red-600 dark:text-red-400 hover:underline"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ) : (
+                  <label
+                    htmlFor="file-upload"
+                    className="cursor-pointer block"
+                  >
+                    <div className="flex flex-col items-center justify-center">
+                      <File size={48} className={`mb-4 ${isDragOver ? 'text-blue-500' : 'text-gray-400'}`} />
+                      <p className={`text-2xl font-semibold mb-2 ${isDragOver ? 'text-blue-700 dark:text-blue-300' : ''}`}>
+                        {isDragOver ? 'Drop file here!' : 'Drop file here or click to upload'}
+                      </p>
+                      <p className="text-base text-gray-500 dark:text-gray-400">
+                        Supports PDF, DOCX, TXT (max {user?.isPremium ? '20MB' : '5MB'})
+                      </p>
+                    </div>
+                  </label>
+                )}
+              </div>
             </div>
-            
-            <div>
-              {renderInputField()}
-            </div>
-            
             <Button
               type="submit"
               variant="primary"

@@ -22,7 +22,7 @@ const ListenPage: React.FC = () => {
   if (!isAuthenticated) {
     return (
       <div>
-        <h1 className="text-2xl font-bold mb-6">Listen</h1>
+        {/* <h1 className="text-2xl font-bold mb-6">Listen</h1> */}
         
         <Card>
           <CardContent className="text-center py-8">
@@ -44,7 +44,7 @@ const ListenPage: React.FC = () => {
   if (isLoading) {
     return (
       <div>
-        <h1 className="text-2xl font-bold mb-6">Listen</h1>
+        {/* <h1 className="text-2xl font-bold mb-6">Listen</h1> */}
         <p>Loading audio summaries...</p>
       </div>
     );
@@ -53,7 +53,7 @@ const ListenPage: React.FC = () => {
   if (audioSummaries.length === 0) {
     return (
       <div>
-        <h1 className="text-2xl font-bold mb-6">Listen</h1>
+        {/* <h1 className="text-2xl font-bold mb-6">Listen</h1> */}
         
         <Card>
           <CardContent className="text-center py-8">
@@ -79,7 +79,7 @@ const ListenPage: React.FC = () => {
   
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">Listen</h1>
+      {/* <h1 className="text-2xl font-bold mb-6">Listen</h1> */}
       
       <div className="space-y-4">
         {audioSummaries.map((summary) => (

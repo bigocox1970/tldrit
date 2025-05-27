@@ -97,7 +97,7 @@ const ProfilePage: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl font-bold">Profile Settings</h1>
+      {/* <h1 className="text-2xl font-bold">Profile Settings</h1> */}
 
       {success && (
         <div className="p-4 bg-green-100 text-green-700 rounded-lg">
