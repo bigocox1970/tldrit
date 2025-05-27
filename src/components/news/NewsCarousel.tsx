@@ -99,6 +99,16 @@ const NewsCarousel: React.FC = () => {
         >
           <Card className="cursor-pointer hover:border-blue-300 border border-gray-200 dark:border-gray-700 transition-all px-2 py-2 sm:px-4 sm:py-3">
             <CardContent>
+              {news.imageUrl && (
+                <div className="w-full h-40 overflow-hidden rounded-md mb-3">
+                  <img
+                    src={news.imageUrl}
+                    alt={news.title}
+                    className="w-full h-full object-cover"
+                    onError={e => (e.currentTarget.style.display = 'none')}
+                  />
+                </div>
+              )}
               <h3 className="font-medium text-lg mb-1 line-clamp-1">
                 {news.title}
               </h3>

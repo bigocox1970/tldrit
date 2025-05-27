@@ -287,14 +287,8 @@ const SummarizeForm: React.FC = () => {
                   }}
                   className="w-full flex-1 p-4 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none overflow-auto min-h-[120px] max-h-none"
                   style={{ minHeight: '120px', height: '100%', maxHeight: 'none' }}
-                  placeholder={`🚀 Get straight to the point!
-
-Paste your ISO documents, British Standards, revision notes, meeting minutes, or any long text below.
-
-💡 Example:
-ISO 9001:2015 Quality management systems — Requirements...
-
-👇 Drop your text here and hit TL;DR it!`}
+                  placeholder={`Get straight to the point!
+Paste your, meeting notes, revision, or any long boring document here to TLDRit!`}
                 />
               )}
               {inputType === 'url' && (
@@ -309,12 +303,12 @@ ISO 9001:2015 Quality management systems — Requirements...
             {/* Always show drop file card below input */}
             <div className="mt-4 flex-1 flex flex-col justify-end">
               <div 
-                className={`border-4 border-dashed rounded-2xl p-12 text-center transition-colors shadow-lg bg-white/70 dark:bg-gray-900/70 ${
+                className={`border-4 border-dashed rounded-2xl p-8 text-center transition-colors shadow-lg bg-white/70 dark:bg-gray-900/70 ${
                   isDragOver 
                     ? 'border-blue-400 bg-blue-50 dark:bg-blue-900/20' 
                     : 'border-gray-300 dark:border-gray-600'
                 }`}
-                style={{ minHeight: '180px' }}
+                style={{ minHeight: '120px' }}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
