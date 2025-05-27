@@ -1,8 +1,8 @@
-const fetch = require('node-fetch');
-const { createClient } = require('@supabase/supabase-js');
+import fetch from 'node-fetch';
+import { createClient } from '@supabase/supabase-js';
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
-exports.handler = async function(event, context) {
+export const handler = async function(event, context) {
   // Handle CORS
   const headers = {
     'Access-Control-Allow-Origin': '*',

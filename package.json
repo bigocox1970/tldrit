@@ -3,6 +3,13 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "netlify": {
+    "functions": {
+      "text-to-speech": {
+        "type": "esm"
+      }
+    }
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
