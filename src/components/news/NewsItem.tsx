@@ -1,11 +1,9 @@
 import React, { useState } from 'react';
-import { Bookmark, BookmarkCheck, FileText, ChevronDown, ChevronUp, Settings, Volume2 } from 'lucide-react';
+import { Volume2, Bookmark, BookmarkCheck, FileText, ChevronDown, ChevronUp } from 'lucide-react';
 import { NewsItem as NewsItemType } from '../../types';
 import Card, { CardContent } from '../ui/Card';
 import { useNewsStore } from '../../store/newsStore';
 import { useAuthStore } from '../../store/authStore';
-import Slider from '../ui/Slider';
-import Toggle from '../ui/Toggle';
 import ReactMarkdown from 'react-markdown';
 
 interface NewsItemProps {
@@ -22,10 +20,6 @@ const NewsItem: React.FC<NewsItemProps> = ({
   const { generateAudioForNewsItem, generateTLDRForNewsItem, isLoading, tldrLoading } = useNewsStore();
   const { user } = useAuthStore();
   const [showTLDR, setShowTLDR] = useState(false);
-  const [showTLDRSettings, setShowTLDRSettings] = useState(false);
-  const [summaryLevel, setSummaryLevel] = useState(2); // Default to short
-  const [isEli5, setIsEli5] = useState(false);
-  const [eli5Level, setEli5Level] = useState(10);
   
   const handleGenerateAudio = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -42,9 +36,9 @@ const NewsItem: React.FC<NewsItemProps> = ({
   const handleGenerateTLDR = (e: React.MouseEvent) => {
     e.stopPropagation();
     generateTLDRForNewsItem(item.id, {
-      summaryLevel,
-      isEli5,
-      eli5Level: isEli5 ? eli5Level : undefined
+      summaryLevel: 2,
+      isEli5: false,
+      eli5Level: undefined
     });
     setShowTLDR(true);
   };
@@ -53,11 +47,6 @@ const NewsItem: React.FC<NewsItemProps> = ({
     e.stopPropagation();
     setShowTLDR(!showTLDR);
   };
-
-  const handleToggleTLDRSettings = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setShowTLDRSettings(!showTLDRSettings);
-  };
   
   const handleClick = () => {
     window.open(item.sourceUrl, '_blank');
@@ -65,17 +54,6 @@ const NewsItem: React.FC<NewsItemProps> = ({
 
   const isTLDRLoading = tldrLoading[item.id] || false;
 
-  const getSummaryLevelText = (level: number) => {
-    const levels = {
-      1: 'Very Short',
-      2: 'Short',
-      3: 'Medium',
-      4: 'Detailed',
-      5: 'Comprehensive'
-    };
-    return levels[level as keyof typeof levels] || 'Medium';
-  };
-  
   return (
     <Card className="cursor-pointer hover:shadow-md transition-shadow">
       <CardContent className="p-0">
@@ -113,68 +91,6 @@ const NewsItem: React.FC<NewsItemProps> = ({
           <p className="text-gray-600 dark:text-gray-400 line-clamp-3 mb-4">
             {item.summary}
           </p>
-
-          {/* TLDR Settings */}
-          {showTLDRSettings && (
-            <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center space-x-2">
-                  <Settings size={16} className="text-gray-600 dark:text-gray-400" />
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    TLDR Settings
-                  </span>
-                </div>
-                <button
-                  onClick={handleToggleTLDRSettings}
-                  className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
-                >
-                  <ChevronUp size={16} className="text-gray-600 dark:text-gray-400" />
-                </button>
-              </div>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Summary Length: {getSummaryLevelText(summaryLevel)}
-                  </label>
-                  <Slider
-                    value={summaryLevel}
-                    onChange={setSummaryLevel}
-                    min={1}
-                    max={5}
-                    step={1}
-                    className="w-full"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    ELI5 Mode (Explain Like I'm 5)
-                  </span>
-                  <Toggle
-                    isOn={isEli5}
-                    onToggle={() => setIsEli5(!isEli5)}
-                  />
-                </div>
-
-                {isEli5 && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Age Level: {eli5Level} years old
-                    </label>
-                    <Slider
-                      value={eli5Level}
-                      onChange={setEli5Level}
-                      min={5}
-                      max={15}
-                      step={1}
-                      className="w-full"
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
 
           {/* TLDR Section */}
           {(item.tldr || showTLDR) && (
@@ -268,19 +184,6 @@ const NewsItem: React.FC<NewsItemProps> = ({
                     TLDR
                   </span>
                 </button>
-
-                {user && !item.tldr && (
-                  <button
-                    onClick={handleToggleTLDRSettings}
-                    className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ml-1"
-                    title="TLDR Settings"
-                  >
-                    <Settings 
-                      size={16} 
-                      className="text-gray-500 dark:text-gray-400" 
-                    />
-                  </button>
-                )}
               </div>
             </div>
 
