@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Bookmark, BookmarkCheck, FileText, ChevronDown, ChevronUp, Settings, Speaker } from 'lucide-react';
+import { Bookmark, BookmarkCheck, FileText, ChevronDown, ChevronUp, Settings, Volume2 } from 'lucide-react';
 import { NewsItem as NewsItemType } from '../../types';
 import Card, { CardContent } from '../ui/Card';
 import { useNewsStore } from '../../store/newsStore';
@@ -240,7 +240,7 @@ const NewsItem: React.FC<NewsItemProps> = ({
                 `}
                 title={item.audioUrl ? "Audio available" : "Generate audio"}
               >
-                <Speaker
+                <Volume2
                   size={20}
                   className={item.audioUrl ? 'text-blue-500' : 'text-gray-500 dark:text-gray-400'}
                 />
