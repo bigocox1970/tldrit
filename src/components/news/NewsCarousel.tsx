@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNewsStore } from '../../store/newsStore';
 import Card, { CardContent } from '../ui/Card';
 import { ChevronLeft, ChevronRight, FileText } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 
 const NewsCarousel: React.FC = () => {
   const { newsItems, fetchNewsItems, isLoading, generateTLDRForNewsItem } = useNewsStore();
@@ -147,8 +148,8 @@ const NewsCarousel: React.FC = () => {
                     <FileText size={16} /> TLDR
                   </button>
                   {tldrVisible[news.id] && news.tldr && (
-                    <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800 text-sm text-gray-800 dark:text-gray-200">
-                      {news.tldr}
+                    <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800 text-sm text-gray-800 dark:text-gray-200 prose prose-blue max-w-none dark:prose-invert">
+                      <ReactMarkdown>{news.tldr}</ReactMarkdown>
                     </div>
                   )}
                 </div>

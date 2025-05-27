@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Headphones, Bookmark, BookmarkCheck, FileText, ChevronDown, ChevronUp, Settings } from 'lucide-react';
+import { Bookmark, BookmarkCheck, FileText, ChevronDown, ChevronUp, Settings, Speaker } from 'lucide-react';
 import { NewsItem as NewsItemType } from '../../types';
 import Card, { CardContent } from '../ui/Card';
 import { useNewsStore } from '../../store/newsStore';
 import { useAuthStore } from '../../store/authStore';
 import Slider from '../ui/Slider';
 import Toggle from '../ui/Toggle';
+import ReactMarkdown from 'react-markdown';
 
 interface NewsItemProps {
   item: NewsItemType;
@@ -198,14 +199,14 @@ const NewsItem: React.FC<NewsItemProps> = ({
               </div>
               
               {showTLDR && (
-                <div className="text-sm text-gray-700 dark:text-gray-300">
+                <div className="text-sm text-gray-700 dark:text-gray-300 prose prose-blue max-w-none dark:prose-invert">
                   {isTLDRLoading ? (
                     <div className="flex items-center space-x-2">
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
                       <span>Generating TLDR summary...</span>
                     </div>
                   ) : item.tldr ? (
-                    <p>{item.tldr}</p>
+                    <ReactMarkdown>{item.tldr}</ReactMarkdown>
                   ) : (
                     <p className="text-gray-500 dark:text-gray-400 italic">
                       Click the TLDR button to generate a summary
@@ -239,9 +240,9 @@ const NewsItem: React.FC<NewsItemProps> = ({
                 `}
                 title={item.audioUrl ? "Audio available" : "Generate audio"}
               >
-                <Headphones 
-                  size={20} 
-                  className={item.audioUrl ? 'text-blue-500' : 'text-gray-500 dark:text-gray-400'} 
+                <Speaker
+                  size={20}
+                  className={item.audioUrl ? 'text-blue-500' : 'text-gray-500 dark:text-gray-400'}
                 />
               </button>
 

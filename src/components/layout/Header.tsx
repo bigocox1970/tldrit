@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Moon, Sun, User } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 
 interface HeaderProps {
   isDarkMode: boolean;

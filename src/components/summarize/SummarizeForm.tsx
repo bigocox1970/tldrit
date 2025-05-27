@@ -125,6 +125,7 @@ const SummarizeForm: React.FC = () => {
       }
       
       setFile(selectedFile);
+      setInputType('file');
       setError('');
     }
   };
@@ -165,6 +166,7 @@ const SummarizeForm: React.FC = () => {
       }
       
       setFile(selectedFile);
+      setInputType('file');
       setError('');
     }
   };
@@ -328,7 +330,7 @@ Paste your, meeting notes, revision, or any long boring document here to TLDRit!
                     <p className="font-medium text-lg">{file.name}</p>
                     <button
                       type="button"
-                      onClick={() => setFile(null)}
+                      onClick={() => { setFile(null); setInputType('text'); }}
                       className="mt-2 text-base text-red-600 dark:text-red-400 hover:underline"
                     >
                       Remove

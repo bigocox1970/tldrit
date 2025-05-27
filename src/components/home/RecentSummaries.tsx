@@ -5,6 +5,7 @@ import { useAuthStore } from '../../store/authStore';
 import Card, { CardContent } from '../ui/Card';
 import Button from '../ui/Button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 
 const RecentSummaries: React.FC = () => {
   const navigate = useNavigate();
@@ -179,7 +180,7 @@ const RecentSummaries: React.FC = () => {
                 {summaries[displayIndex].title}
               </h3>
               <p className="text-gray-600 dark:text-gray-400 line-clamp-2 text-sm">
-                {summaries[displayIndex].summary}
+                <ReactMarkdown>{summaries[displayIndex].summary}</ReactMarkdown>
               </p>
               <div className="flex justify-between items-center mt-2 text-xs text-gray-500 dark:text-gray-400">
                 <span>

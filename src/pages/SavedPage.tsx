@@ -4,6 +4,7 @@ import { useSummaryStore } from '../store/summaryStore';
 import { useAuthStore } from '../store/authStore';
 import Card, { CardContent } from '../components/ui/Card';
 import Button from '../components/ui/Button';
+import ReactMarkdown from 'react-markdown';
 
 const SavedPage: React.FC = () => {
   const navigate = useNavigate();
@@ -91,9 +92,9 @@ const SavedPage: React.FC = () => {
               </h3>
               
               {selectedSummary === summary.id ? (
-                <p className="text-gray-600 dark:text-gray-400 whitespace-pre-line">
-                  {summary.summary}
-                </p>
+                <div className="prose dark:prose-invert max-w-none">
+                  <ReactMarkdown>{summary.summary}</ReactMarkdown>
+                </div>
               ) : (
                 <p className="text-gray-600 dark:text-gray-400 line-clamp-2">
                   {summary.summary}

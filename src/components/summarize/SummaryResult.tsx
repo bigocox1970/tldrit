@@ -1,4 +1,5 @@
 import React from 'react';
+import ReactMarkdown from 'react-markdown';
 import { Headphones, Save } from 'lucide-react';
 import { useSummaryStore } from '../../store/summaryStore';
 import { useAuthStore } from '../../store/authStore';
@@ -26,7 +27,7 @@ const SummaryResult: React.FC = () => {
       </CardHeader>
       
       <CardContent className="prose dark:prose-invert max-w-none">
-        <p className="whitespace-pre-line">{currentSummary.summary}</p>
+        <ReactMarkdown>{currentSummary.summary}</ReactMarkdown>
       </CardContent>
       
       <CardFooter className="border-t border-gray-200 dark:border-gray-700 flex justify-between">
