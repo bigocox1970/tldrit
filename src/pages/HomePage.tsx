@@ -9,37 +9,37 @@ import { Smartphone, BookOpen, Lightbulb, GraduationCap, FileText, User } from '
 const eli5AdCards = [
   {
     tagline: '"explain it like im 5"',
-    subtext: 'Understand complex documents, processes and theories with eli5.app',
+    subtext: 'Understand anything with eli5.app',
     icon: Lightbulb,
   },
   {
     tagline: '"Understand Anything. ELI5 Style."',
-    subtext: 'Complex Ideas. Simple Words.',
+    subtext: 'Simple words for complex ideas.',
     icon: Lightbulb,
   },
   {
-    tagline: '"Knowledge Without the Jargon."',
-    subtext: 'Turn Confusion into Clarity.',
+    tagline: '"No More Jargon."',
+    subtext: 'Turn confusion into clarity.',
     icon: FileText,
   },
   {
-    tagline: '"Because Learning Shouldn\'t Be Hard."',
-    subtext: 'Revision... easy! Use eli5.app for your studies.',
+    tagline: '"Learning Shouldn\'t Be Hard."',
+    subtext: 'Revision made easy with eli5.app.',
     icon: BookOpen,
   },
   {
     tagline: '"Revision Made Easy."',
-    subtext: '📘 For Students & Revision',
+    subtext: 'For students & revision.',
     icon: BookOpen,
   },
   {
-    tagline: '"Ace Exams with ELI5 Power."',
-    subtext: 'Study Smarter, Not Harder.',
+    tagline: '"Ace Exams with ELI5."',
+    subtext: 'Study smarter, not harder.',
     icon: GraduationCap,
   },
   {
     tagline: '"Turn Notes into Nuggets."',
-    subtext: 'Your Study Sidekick.',
+    subtext: 'Your study sidekick.',
     icon: User,
   },
   {
@@ -49,55 +49,99 @@ const eli5AdCards = [
   },
 ];
 
+const FLIP_DURATION = 600; // ms
+const INTERVAL = 10000; // ms
+
 const HomePage: React.FC = () => {
   const [adIndex, setAdIndex] = useState(0);
-  const [fade, setFade] = useState(false);
+  const [isFlipping, setIsFlipping] = useState(false);
+  const [showBack, setShowBack] = useState(false);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setFade(true);
+      setIsFlipping(true);
+      setTimeout(() => {
+        setShowBack(true); // show back side (next card)
+      }, FLIP_DURATION / 2);
       setTimeout(() => {
         setAdIndex((i) => (i + 1) % eli5AdCards.length);
-        setFade(false);
-      }, 400); // fade out, then switch
-    }, 10000);
+        setShowBack(false); // return to front side (new card)
+        setIsFlipping(false);
+      }, FLIP_DURATION);
+    }, INTERVAL);
     return () => clearInterval(interval);
   }, []);
 
   const ad = eli5AdCards[adIndex];
+  const nextAd = eli5AdCards[(adIndex + 1) % eli5AdCards.length];
   const Icon = ad.icon;
+  const NextIcon = nextAd.icon;
 
   return (
     <div>
       <HeroSection />
       <FeatureSection />
       {/* Removed NewsCarousel and RecentSummaries */}
-      {/* Ad Banner for ELI5.app */}
+      {/* Ad Banner for ELI5.app with 3D flip animation */}
       <div className="w-full flex justify-center mt-8 mb-4">
         <a
           href="https://eli5.app"
           target="_blank"
           rel="noopener noreferrer"
-          className="block w-[728px] max-w-full h-[90px] overflow-hidden bg-gradient-to-r from-blue-700 via-pink-500 to-yellow-400 rounded-lg shadow-lg flex items-center justify-center border-2 border-blue-300 hover:shadow-xl transition"
+          className="block w-[728px] max-w-full h-[90px] overflow-hidden bg-gradient-to-r from-blue-700 via-pink-500 to-yellow-400 rounded-lg shadow-lg flex items-center justify-center border-2 border-blue-300 hover:shadow-xl transition px-8 py-4"
           style={{ minHeight: 90 }}
         >
           <div
-            style={{
-              opacity: fade ? 0 : 1,
-              transition: 'opacity 0.4s',
-            }}
-            key={adIndex}
-            className="flex items-center gap-4 w-full h-full justify-center"
+            className="relative w-full h-full flex items-center justify-center"
+            style={{ perspective: '1200px' }}
           >
-            <Icon size={38} className="text-white drop-shadow-md" />
-            <div className="flex flex-col items-start justify-center">
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-extrabold text-white tracking-tight lowercase">eli5</span>
-                <span className="italic text-2xl font-bold text-white lowercase">.app</span>
-                <span className="ml-2 text-lg font-semibold text-white">{ad.tagline}</span>
+            <div
+              className="absolute w-full h-full flex items-center justify-center"
+              style={{
+                transformStyle: 'preserve-3d',
+                transition: `transform ${FLIP_DURATION}ms cubic-bezier(0.4,0.2,0.2,1)`,
+                transform: isFlipping ? 'rotateY(180deg)' : 'rotateY(0deg)',
+              }}
+            >
+              {/* Front Side */}
+              <div
+                className={`w-full h-full flex items-center justify-center backface-hidden transition-opacity duration-300 ${!showBack ? 'opacity-100' : 'opacity-0'}`}
+                style={{ backfaceVisibility: 'hidden', position: 'absolute', top: 0, left: 0 }}
+              >
+                <Icon size={34} className="text-white drop-shadow-md mr-4" />
+                <div className="flex flex-col items-start justify-center leading-tight overflow-hidden max-h-full w-full">
+                  <div className="flex items-baseline gap-2 leading-tight w-full flex-wrap">
+                    <span className="text-2xl sm:text-2xl font-extrabold text-white tracking-tight lowercase line-clamp-2">eli5</span>
+                    <span className="italic text-xl sm:text-xl font-bold text-white lowercase line-clamp-2">.app</span>
+                    <span className="ml-2 text-base sm:text-base font-semibold text-white whitespace-normal line-clamp-2">{ad.tagline}</span>
+                  </div>
+                  <div className="text-xs sm:text-sm font-medium text-white mt-1 text-left leading-tight line-clamp-2 w-full">
+                    {ad.subtext}
+                  </div>
+                </div>
               </div>
-              <div className="text-base font-medium text-white mt-1 text-left">
-                {ad.subtext}
+              {/* Back Side (next card) */}
+              <div
+                className={`w-full h-full flex items-center justify-center backface-hidden transition-opacity duration-300 ${showBack ? 'opacity-100' : 'opacity-0'}`}
+                style={{
+                  backfaceVisibility: 'hidden',
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  transform: 'rotateY(180deg)',
+                }}
+              >
+                <NextIcon size={34} className="text-white drop-shadow-md mr-4" />
+                <div className="flex flex-col items-start justify-center leading-tight overflow-hidden max-h-full w-full">
+                  <div className="flex items-baseline gap-2 leading-tight w-full flex-wrap">
+                    <span className="text-2xl sm:text-2xl font-extrabold text-white tracking-tight lowercase line-clamp-2">eli5</span>
+                    <span className="italic text-xl sm:text-xl font-bold text-white lowercase line-clamp-2">.app</span>
+                    <span className="ml-2 text-base sm:text-base font-semibold text-white whitespace-normal line-clamp-2">{nextAd.tagline}</span>
+                  </div>
+                  <div className="text-xs sm:text-sm font-medium text-white mt-1 text-left leading-tight line-clamp-2 w-full">
+                    {nextAd.subtext}
+                  </div>
+                </div>
               </div>
             </div>
           </div>

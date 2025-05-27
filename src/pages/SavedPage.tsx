@@ -5,12 +5,16 @@ import { useAuthStore } from '../store/authStore';
 import Card, { CardContent } from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import ReactMarkdown from 'react-markdown';
+import { Volume2 } from 'lucide-react';
+import { Summary } from '../types';
 
 const SavedPage: React.FC = () => {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuthStore();
-  const { summaries, fetchSummaries, isLoading } = useSummaryStore();
+  const { summaries, fetchSummaries, isLoading, generateAudioForSummary } = useSummaryStore();
   const [selectedSummary, setSelectedSummary] = useState<string | null>(null);
+  const [audioLoading, setAudioLoading] = useState<{ [id: string]: boolean }>({});
+  const audioRefs = React.useRef<{ [id: string]: HTMLAudioElement | null }>({});
   
   useEffect(() => {
     if (isAuthenticated) {
@@ -20,6 +24,26 @@ const SavedPage: React.FC = () => {
   
   const handleSummaryClick = (summaryId: string) => {
     setSelectedSummary(summaryId === selectedSummary ? null : summaryId);
+  };
+  
+  const handleSpeakerClick = async (summary: Summary, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (summary.audioUrl) {
+      // Play audio
+      if (!audioRefs.current[summary.id]) {
+        audioRefs.current[summary.id] = new Audio(summary.audioUrl);
+        audioRefs.current[summary.id]?.addEventListener('ended', () => {
+          // setAudioPlaying((prev) => ({ ...prev, [summary.id]: false }));
+        });
+      }
+      // setAudioPlaying((prev) => ({ ...prev, [summary.id]: true }));
+      audioRefs.current[summary.id]?.play();
+    } else {
+      // Generate audio
+      setAudioLoading((prev) => ({ ...prev, [summary.id]: true }));
+      await generateAudioForSummary(summary.id);
+      setAudioLoading((prev) => ({ ...prev, [summary.id]: false }));
+    }
   };
   
   if (!isAuthenticated) {
@@ -108,6 +132,25 @@ const SavedPage: React.FC = () => {
                 <span>
                   {summary.isEli5 ? 'ELI5' : `Level ${summary.summaryLevel}`}
                 </span>
+                <button
+                  onClick={(e) => handleSpeakerClick(summary, e)}
+                  className={`ml-2 p-2 rounded-full transition-colors border border-gray-200 dark:border-gray-700
+                    ${audioLoading[summary.id] ? 'animate-pulse bg-green-200' : summary.audioUrl ? 'bg-green-500' : 'bg-gray-200 dark:bg-gray-700'}
+                  `}
+                  title={summary.audioUrl ? 'Play audio' : 'Generate audio'}
+                  disabled={audioLoading[summary.id]}
+                >
+                  <Volume2
+                    size={20}
+                    className={
+                      audioLoading[summary.id]
+                        ? 'text-green-700'
+                        : summary.audioUrl
+                        ? 'text-white'
+                        : 'text-gray-500 dark:text-gray-400'
+                    }
+                  />
+                </button>
               </div>
             </CardContent>
           </Card>

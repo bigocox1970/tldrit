@@ -1,4 +1,6 @@
 const fetch = require('node-fetch');
+const { createClient } = require('@supabase/supabase-js');
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 exports.handler = async function(event, context) {
   // Handle CORS
@@ -25,14 +27,58 @@ exports.handler = async function(event, context) {
   }
 
   try {
-    const { text, isPremium } = JSON.parse(event.body);
+    const { text } = JSON.parse(event.body);
+    const authHeader = event.headers.authorization;
 
-    if (!text) {
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return {
-        statusCode: 400,
+        statusCode: 401,
         headers,
-        body: JSON.stringify({ error: 'Text is required' }),
+        body: JSON.stringify({ error: 'Unauthorized' }),
       };
+    }
+
+    // Get user from JWT
+    const jwt = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: userError } = await supabase.auth.getUser(jwt);
+    if (userError || !user) {
+      return {
+        statusCode: 401,
+        headers,
+        body: JSON.stringify({ error: 'Invalid user token' }),
+      };
+    }
+
+    // Fetch user profile
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('plan, credits')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || !profile) {
+      return {
+        statusCode: 403,
+        headers,
+        body: JSON.stringify({ error: 'No profile found' }),
+      };
+    }
+
+    // Check plan/credits
+    if (profile.plan !== 'pro' && profile.credits <= 0) {
+      return {
+        statusCode: 403,
+        headers,
+        body: JSON.stringify({ error: 'No credits left or not pro.' }),
+      };
+    }
+
+    // If not pro, decrement credits
+    if (profile.plan !== 'pro') {
+      await supabase
+        .from('profiles')
+        .update({ credits: profile.credits - 1 })
+        .eq('id', user.id);
     }
 
     // Use OpenAI's text-to-speech API
@@ -42,8 +88,8 @@ exports.handler = async function(event, context) {
       throw new Error('OpenAI API key not configured');
     }
 
-    // Choose voice based on premium status
-    const voice = isPremium ? 'alloy' : 'echo';
+    // Choose voice based on plan
+    const voice = profile.plan === 'pro' ? 'alloy' : 'echo';
     
     const response = await fetch('https://api.openai.com/v1/audio/speech', {
       method: 'POST',
