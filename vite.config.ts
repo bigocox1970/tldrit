@@ -88,7 +88,7 @@ export default defineConfig(({ mode }) => {
         '/api/text-to-speech': {
           target: 'https://tldrit.netlify.app',
           changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api/, '/.netlify/functions'),
+          rewrite: (path) => path.replace(/^\/api\/text-to-speech/, '/.netlify/functions/text-to-speech.mjs'),
           configure: (proxy) => {
             proxy.on('error', (err) => {
               console.log('proxy error', err);

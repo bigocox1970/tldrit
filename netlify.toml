@@ -13,5 +13,5 @@
 
 [[redirects]]
   from = "/api/text-to-speech"
-  to = "/.netlify/functions/text-to-speech"
+  to = "/.netlify/functions/text-to-speech.mjs"
   status = 200
