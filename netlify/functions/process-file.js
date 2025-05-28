@@ -1,5 +1,6 @@
 const multipart = require('parse-multipart-data');
 const pdf = require('pdf-parse');
+const mammoth = require('mammoth');
 
 exports.handler = async function(event, context) {
   // Handle CORS
@@ -67,9 +68,15 @@ exports.handler = async function(event, context) {
       content = fileData.toString('utf-8');
       console.log('TXT content extracted, length:', content.length);
     } else if (filename.toLowerCase().endsWith('.docx')) {
-      // For DOCX files, we'd need a library like mammoth
-      // For now, return an error message
-      throw new Error('DOCX files are not yet supported. Please convert to PDF or TXT format.');
+      try {
+        console.log('Processing DOCX file...');
+        const result = await mammoth.extractRawText({ buffer: fileData });
+        content = result.value;
+        console.log('DOCX content extracted, length:', content.length);
+      } catch (error) {
+        console.error('DOCX processing error:', error);
+        throw new Error('Failed to process DOCX file: ' + error.message);
+      }
     } else {
       throw new Error('Unsupported file type. Please upload PDF, TXT, or DOCX files.');
     }
