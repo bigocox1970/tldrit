@@ -92,8 +92,7 @@ const NewsItem: React.FC<NewsItemProps> = ({ item }) => {
     if (showTLDR && !newsItem.tldr && user && !tldrLoading[item.id]) {
       useNewsStore.getState().generateTLDRForNewsItem(item.id);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showTLDR]);
+  }, [showTLDR, newsItem.tldr, user, tldrLoading[item.id], item.id]);
 
   return (
     <Card className="cursor-pointer hover:shadow-md transition-shadow">

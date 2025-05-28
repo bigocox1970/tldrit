@@ -1,8 +1,9 @@
 import { create } from 'zustand';
 import { NewsItem, UserInterest } from '../types';
-import { getAvailableInterests, saveUserInterests, getUserNewsMeta, upsertUserNewsMeta, updateNewsTLDR, updateNewsAudio, getNewsItemById } from '../lib/supabase';
+import { getAvailableInterests, saveUserInterests, getUserNewsMeta, upsertUserNewsMeta, getNewsByUrlHash, upsertNewsByUrlHash } from '../lib/supabase';
 import { useAuthStore } from './authStore';
 import { generateAudio, summarizeUrl } from '../lib/ai';
+import { urlToHash } from '../lib/hash';
 
 interface TLDROptions {
   summaryLevel: number;
@@ -186,11 +187,12 @@ export const useNewsStore = create<NewsState>((set, get) => ({
     const user = useAuthStore.getState().user;
     if (!user) return;
     
-    let newsItem = get().newsItems.find(item => item.id === newsItemId);
+    const newsItem = get().newsItems.find(item => item.id === newsItemId);
     if (!newsItem) return;
+    const urlHash = urlToHash(newsItem.sourceUrl);
 
     // Always check Supabase for latest audio_url before generating
-    const { data: dbNews, error: dbError } = await getNewsItemById(newsItemId);
+    const { data: dbNews, error: dbError } = await getNewsByUrlHash(urlHash);
     if (dbError) {
       set({ error: 'Failed to check audio in database' });
       return;
@@ -211,7 +213,8 @@ export const useNewsStore = create<NewsState>((set, get) => ({
     try {
       const audioText = newsItem.tldr || newsItem.summary;
       const audioUrl = await generateAudio(audioText, user.isPremium);
-      
+      // Save audioUrl to Supabase by url_hash
+      await upsertNewsByUrlHash({ url_hash: urlHash, source_url: newsItem.sourceUrl, audio_url: audioUrl });
       set(state => ({
         newsItems: state.newsItems.map(item => 
           item.id === newsItemId 
@@ -236,16 +239,20 @@ export const useNewsStore = create<NewsState>((set, get) => ({
       return;
     }
     
-    let newsItem = get().newsItems.find(item => item.id === newsItemId);
+    const newsItem = get().newsItems.find(item => item.id === newsItemId);
     if (!newsItem) return;
+    const urlHash = urlToHash(newsItem.sourceUrl);
 
+    console.log('[TLDR] Checking Supabase for TLDR:', { urlHash, sourceUrl: newsItem.sourceUrl });
     // Always check Supabase for latest TLDR before generating
-    const { data: dbNews, error: dbError } = await getNewsItemById(newsItemId);
+    const { data: dbNews, error: dbError } = await getNewsByUrlHash(urlHash);
+    console.log('[TLDR] Supabase fetch result:', { dbNews, dbError });
     if (dbError) {
       set({ error: 'Failed to check TLDR in database' });
       return;
     }
     if (dbNews && dbNews.tldr) {
+      console.log('[TLDR] Found TLDR in Supabase:', dbNews.tldr);
       // Update local store and return
       set(state => ({
         newsItems: state.newsItems.map(item =>
@@ -264,13 +271,13 @@ export const useNewsStore = create<NewsState>((set, get) => ({
     }));
     
     try {
-      console.log(`Generating TLDR for: ${newsItem.title}`);
-      
+      console.log('[TLDR] Generating TLDR with LLM for:', newsItem.sourceUrl);
       // Use the existing summarizeUrl function from ai.ts with options
       const tldrSummary = await summarizeUrl(newsItem.sourceUrl, user.isPremium, options);
-      // Update shared TLDR in Supabase
-      await updateNewsTLDR(newsItemId, tldrSummary);
-      
+      console.log('[TLDR] LLM returned:', tldrSummary);
+      // Update shared TLDR in Supabase by url_hash
+      const upsertResult = await upsertNewsByUrlHash({ url_hash: urlHash, source_url: newsItem.sourceUrl, tldr: tldrSummary });
+      console.log('[TLDR] Upserted TLDR to Supabase:', upsertResult);
       set(state => ({
         newsItems: state.newsItems.map(item => 
           item.id === newsItemId 
@@ -282,8 +289,9 @@ export const useNewsStore = create<NewsState>((set, get) => ({
       }));
       // Add to playlist for this user
       await upsertUserNewsMeta(user.id, newsItemId, { inPlaylist: true });
+      console.log('[TLDR] Updated local state and playlist');
     } catch (error) {
-      console.error('Error generating TLDR:', error);
+      console.error('[TLDR] Error generating TLDR:', error);
       set(state => ({
         tldrLoading: { ...state.tldrLoading, [newsItemId]: false },
         error: 'Failed to generate TLDR summary'

@@ -179,3 +179,42 @@ export async function getNewsItemById(newsId: string) {
     .single();
   return { data, error };
 }
+
+// Fetch a news item by source_url
+export async function getNewsBySourceUrl(sourceUrl: string) {
+  const { data, error } = await supabase
+    .from('news')
+    .select('*')
+    .eq('source_url', sourceUrl)
+    .single();
+  return { data, error };
+}
+
+// Upsert a news item by source_url
+export async function upsertNewsBySourceUrl(news: Record<string, any>) {
+  const { data, error } = await supabase
+    .from('news')
+    .upsert([news], { onConflict: 'source_url' })
+    .select()
+    .single();
+  return { data, error };
+}
+
+// Fetch a news item by url_hash
+export async function getNewsByUrlHash(urlHash: string) {
+  const { data, error } = await supabase
+    .from('news')
+    .select('*')
+    .eq('url_hash', urlHash);
+  return { data: Array.isArray(data) && data.length > 0 ? data[0] : null, error };
+}
+
+// Upsert a news item by url_hash
+export async function upsertNewsByUrlHash(news: Record<string, any>) {
+  const { data, error } = await supabase
+    .from('news')
+    .upsert([news], { onConflict: 'url_hash' })
+    .select()
+    .single();
+  return { data, error };
+}
