@@ -191,7 +191,8 @@ export const useNewsStore = create<NewsState>((set, get) => ({
     
     set({ isLoading: true, error: null });
     try {
-      const audioUrl = await generateAudio(newsItem.summary, user.isPremium);
+      const audioText = newsItem.tldr || newsItem.summary;
+      const audioUrl = await generateAudio(audioText, user.isPremium);
       
       set(state => ({
         newsItems: state.newsItems.map(item => 
