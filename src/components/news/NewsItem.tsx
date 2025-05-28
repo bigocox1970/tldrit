@@ -34,6 +34,8 @@ const NewsItem: React.FC<NewsItemProps> = ({ item }) => {
     window.open(item.sourceUrl, '_blank');
   };
 
+  const newsItem = useNewsStore(state => state.newsItems.find(i => i.id === item.id)) || item;
+
   const isTLDRLoading = tldrLoading[item.id] || false;
 
   const handleSpeakerClick = async (e: React.MouseEvent) => {
@@ -47,10 +49,10 @@ const NewsItem: React.FC<NewsItemProps> = ({ item }) => {
       }
     });
 
-    if (item.audioUrl) {
+    if (newsItem.audioUrl) {
       // Initialize audio if not already done
       if (!audioRefs.current[item.id]) {
-        audioRefs.current[item.id] = new Audio(item.audioUrl);
+        audioRefs.current[item.id] = new Audio(newsItem.audioUrl);
         audioRefs.current[item.id]?.addEventListener('ended', () => {
           setAudioPlaying(prev => ({ ...prev, [item.id]: false }));
         });
@@ -69,9 +71,9 @@ const NewsItem: React.FC<NewsItemProps> = ({ item }) => {
       try {
         await generateAudioForNewsItem(item.id);
         // After generating, auto-play if audioUrl is now set
-        if (item.audioUrl) {
+        if (newsItem.audioUrl) {
           if (!audioRefs.current[item.id]) {
-            audioRefs.current[item.id] = new Audio(item.audioUrl);
+            audioRefs.current[item.id] = new Audio(newsItem.audioUrl);
             audioRefs.current[item.id]?.addEventListener('ended', () => {
               setAudioPlaying(prev => ({ ...prev, [item.id]: false }));
             });
@@ -84,6 +86,14 @@ const NewsItem: React.FC<NewsItemProps> = ({ item }) => {
       }
     }
   };
+
+  // Auto-trigger TLDR generation if dropdown is opened and TLDR is missing
+  useEffect(() => {
+    if (showTLDR && !newsItem.tldr && user && !tldrLoading[item.id]) {
+      useNewsStore.getState().generateTLDRForNewsItem(item.id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showTLDR]);
 
   return (
     <Card className="cursor-pointer hover:shadow-md transition-shadow">
@@ -124,7 +134,7 @@ const NewsItem: React.FC<NewsItemProps> = ({ item }) => {
           </p>
 
           {/* TLDR Section */}
-          {(item.tldr || showTLDR) && (
+          {(newsItem.tldr || showTLDR) && (
             <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center space-x-2">
@@ -156,7 +166,7 @@ const NewsItem: React.FC<NewsItemProps> = ({ item }) => {
                             ? 'animate-pulse bg-green-200'
                             : audioPlaying[item.id]
                             ? 'bg-green-600'
-                            : item.audioUrl
+                            : newsItem.audioUrl
                             ? 'bg-green-500'
                             : 'bg-gray-200 dark:bg-gray-700'}
                         `}
@@ -164,7 +174,7 @@ const NewsItem: React.FC<NewsItemProps> = ({ item }) => {
                           ? 'Generating audio...'
                           : audioPlaying[item.id]
                           ? 'Pause audio'
-                          : item.audioUrl
+                          : newsItem.audioUrl
                           ? 'Play audio'
                           : 'Generate audio'}
                       >
@@ -174,7 +184,7 @@ const NewsItem: React.FC<NewsItemProps> = ({ item }) => {
                             ? 'text-green-700'
                             : audioPlaying[item.id]
                             ? 'text-white animate-pulse'
-                            : item.audioUrl
+                            : newsItem.audioUrl
                             ? 'text-white'
                             : 'text-gray-500 dark:text-gray-400'}
                         />
@@ -204,8 +214,8 @@ const NewsItem: React.FC<NewsItemProps> = ({ item }) => {
                       title={copied ? 'Copied!' : 'Copy TLDR'}
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (item.tldr) {
-                          navigator.clipboard.writeText(item.tldr);
+                        if (newsItem.tldr) {
+                          navigator.clipboard.writeText(newsItem.tldr);
                           setCopied(true);
                           setTimeout(() => setCopied(false), 1500);
                         }
@@ -223,8 +233,8 @@ const NewsItem: React.FC<NewsItemProps> = ({ item }) => {
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
                         <span>Generating TLDR summary...</span>
                       </div>
-                    ) : item.tldr ? (
-                      <ReactMarkdown>{item.tldr}</ReactMarkdown>
+                    ) : newsItem.tldr ? (
+                      <ReactMarkdown>{newsItem.tldr}</ReactMarkdown>
                     ) : (
                       <p className="italic">
                         Click the TLDR button to generate a summary
@@ -239,11 +249,11 @@ const NewsItem: React.FC<NewsItemProps> = ({ item }) => {
           <div className="flex justify-between items-center">
             <div className="flex items-center">
               <button
-                onClick={item.tldr ? () => setShowTLDR(!showTLDR) : (e) => {
+                onClick={(e) => {
                   e.stopPropagation();
-                  if (user) {
+                  if (!showTLDR) setShowTLDR(true);
+                  if (!newsItem.tldr && user && !tldrLoading[item.id]) {
                     useNewsStore.getState().generateTLDRForNewsItem(item.id);
-                    setShowTLDR(true);
                   }
                 }}
                 disabled={tldrLoading[item.id] || !user}
@@ -255,10 +265,10 @@ const NewsItem: React.FC<NewsItemProps> = ({ item }) => {
                 ) : (
                   <FileText 
                     size={20} 
-                    className={item.tldr ? 'text-blue-500' : 'text-gray-500 dark:text-gray-400'} 
+                    className={newsItem.tldr ? 'text-blue-500' : 'text-gray-500 dark:text-gray-400'} 
                   />
                 )}
-                <span className={`text-sm font-medium ${item.tldr ? 'text-blue-500' : 'text-gray-500 dark:text-gray-400'}`}>
+                <span className={`text-sm font-medium ${newsItem.tldr ? 'text-blue-500' : 'text-gray-500 dark:text-gray-400'}`}>
                   TLDR
                 </span>
               </button>
