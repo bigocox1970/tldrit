@@ -169,3 +169,13 @@ export async function updateNewsAudio(newsId: string, audioUrl: string) {
     .eq('id', newsId);
   return { data, error };
 }
+
+// Fetch a single news item by id (with tldr and audio_url)
+export async function getNewsItemById(newsId: string) {
+  const { data, error } = await supabase
+    .from('news')
+    .select('*')
+    .eq('id', newsId)
+    .single();
+  return { data, error };
+}
