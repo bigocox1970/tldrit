@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { NewsItem, UserInterest } from '../types';
-import { getAvailableInterests, saveUserInterests, getUserNewsMeta, upsertUserNewsMeta, updateNewsTLDR, updateNewsAudio } from '../lib/supabase';
+import { getAvailableInterests, saveUserInterests, getUserNewsMeta, upsertUserNewsMeta, updateNewsTLDR, getNewsItems } from '../lib/supabase';
 import { useAuthStore } from './authStore';
 import { generateAudio, summarizeUrl } from '../lib/ai';
 
@@ -28,6 +28,18 @@ interface NewsState {
   togglePlaylist: (newsItemId: string) => void;
 }
 
+type SupabaseNewsItem = {
+  id: string;
+  title: string;
+  source_url: string;
+  category: string;
+  summary: string;
+  published_at: string;
+  image_url?: string;
+  tldr?: string;
+  audio_url?: string;
+};
+
 export const useNewsStore = create<NewsState>((set, get) => ({
   newsItems: [],
   interests: [],
@@ -51,62 +63,64 @@ export const useNewsStore = create<NewsState>((set, get) => ({
     const user = useAuthStore.getState().user;
     
     try {
-      let categories: string[];
-      
-      if (user && user.interests.length > 0) {
-        // Use user's selected interests
-        categories = user.interests;
-      } else {
-      // Use default categories for non-authenticated users or users without interests
-      categories = ['technology', 'world', 'business', 'science', 'crypto', 'ai'];
-      }
-      
-      console.log('Fetching news for categories:', categories);
-      
       let newsItems: NewsItem[] = [];
-      
-      // Try Netlify function first (for production), fallback to direct RSS parsing (for local dev)
-      try {
-        const response = await fetch('/.netlify/functions/fetch-news', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ categories }),
-        });
+      if (user) {
+        // Always fetch from Supabase, including tldr and audio_url
+        const { data, error } = await getNewsItems(user.id);
+        if (error) throw error;
+        newsItems = (data || []).map((item: SupabaseNewsItem) => ({
+          id: item.id,
+          title: item.title,
+          sourceUrl: item.source_url,
+          category: item.category,
+          summary: item.summary,
+          publishedAt: item.published_at,
+          imageUrl: item.image_url,
+          tldr: item.tldr,
+          audioUrl: item.audio_url,
+        }));
+      } else {
+        // Use default categories for non-authenticated users or users without interests
+        const categories = ['technology', 'world', 'business', 'science', 'crypto', 'ai'];
+        // Fallback to Netlify function or local RSS parsing
+        try {
+          const response = await fetch('/.netlify/functions/fetch-news', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ categories }),
+          });
 
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success) {
-            newsItems = data.newsItems || [];
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success) {
+              newsItems = data.newsItems || [];
+            } else {
+              throw new Error(data.error || 'Failed to fetch news');
+            }
           } else {
-            throw new Error(data.error || 'Failed to fetch news');
+            throw new Error(`HTTP error! status: ${response.status}`);
           }
-        } else {
-          throw new Error(`HTTP error! status: ${response.status}`);
+        } catch (error) {
+          console.log('Netlify function not available, using direct RSS parsing for local development:', error);
+          const { fetchNewsForCategories } = await import('../lib/rss');
+          newsItems = await fetchNewsForCategories(categories);
         }
-      } catch (error) {
-        console.log('Netlify function not available, using direct RSS parsing for local development:', error);
-        
-        // Fallback to direct RSS parsing for local development
-        const { fetchNewsForCategories } = await import('../lib/rss');
-        newsItems = await fetchNewsForCategories(categories);
       }
-      
       set({ 
         newsItems, 
         isLoading: false, 
         error: null,
         isFetching: false
       });
-      
       // Merge per-user meta
       if (user) {
         const { data: meta } = await getUserNewsMeta(user.id);
         if (meta) {
           set(state => ({
             newsItems: state.newsItems.map(item => {
-              const metaItem = meta.find((m: any) => m.news_id === item.id);
+              const metaItem = meta.find((m: { news_id: string; bookmarked?: boolean; inPlaylist?: boolean }) => m.news_id === item.id);
               return metaItem ? { ...item, bookmarked: metaItem.bookmarked, inPlaylist: metaItem.inPlaylist } : item;
             })
           }));
