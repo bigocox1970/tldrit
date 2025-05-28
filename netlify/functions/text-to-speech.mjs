@@ -1,6 +1,10 @@
 import fetch from 'node-fetch';
 import { createClient } from '@supabase/supabase-js';
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+
+const supabase = createClient(
+  process.env.VITE_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
 export const handler = async function(event, context) {
   // Handle CORS
@@ -82,7 +86,7 @@ export const handler = async function(event, context) {
     }
 
     // Use OpenAI's text-to-speech API
-    const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+    const OPENAI_API_KEY = process.env.VITE_OPENAI_API_KEY;
     
     if (!OPENAI_API_KEY) {
       throw new Error('OpenAI API key not configured');
