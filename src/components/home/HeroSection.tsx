@@ -58,23 +58,23 @@ const HeroSection: React.FC = () => {
     if (ohStep === 0) {
       return (
         <span>
-          <span className="text-white font-extrabold">Oh,</span>
+          <span className="text-gray-900 dark:text-white font-extrabold">Oh,</span>
         </span>
       );
     } else if (ohStep === 1) {
       return (
         <span>
-          <span className="text-white font-extrabold">Oh,</span>
-          <span className="inline-block w-8 text-white animate-pulse">{' '.repeat(1)}{'.'.repeat(dotCount)}</span>
+          <span className="text-gray-900 dark:text-white font-extrabold">Oh,</span>
+          <span className="inline-block w-8 text-gray-900 dark:text-white animate-pulse">{' '.repeat(1)}{'.'.repeat(dotCount)}</span>
         </span>
       );
     } else {
       // Reveal the rest
       return (
         <span>
-          <span className="text-white font-extrabold">Oh,</span>
-          <span className="inline-block w-8 text-white">...</span>
-          <span className="ml-2">and <span className="text-white font-extrabold">ANY</span> webpage</span>
+          <span className="text-gray-900 dark:text-white font-extrabold">Oh,</span>
+          <span className="inline-block w-8 text-gray-900 dark:text-white">...</span>
+          <span className="ml-2">and <span className="text-gray-900 dark:text-white font-extrabold">ANY</span> webpage</span>
         </span>
       );
     }
@@ -97,7 +97,7 @@ const HeroSection: React.FC = () => {
           </span>
         ) : (
           <>
-            <span className="text-white font-extrabold">TLDR</span>{' '}
+            <span className="text-gray-900 dark:text-white font-extrabold">TLDR</span>{' '}
             <span className="inline-block transition-all duration-500 ease-in-out text-blue-600 dark:text-blue-400">
               {dynamicTexts[currentTextIndex]}
             </span>

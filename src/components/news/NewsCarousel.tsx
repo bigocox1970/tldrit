@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNewsStore } from '../../store/newsStore';
 import Card, { CardContent } from '../ui/Card';
-import { ChevronLeft, ChevronRight, FileText } from 'lucide-react';
+import { ChevronLeft, ChevronRight, FileText, Copy } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 const NewsCarousel: React.FC = () => {
@@ -148,7 +148,33 @@ const NewsCarousel: React.FC = () => {
                     <FileText size={16} /> TLDR
                   </button>
                   {tldrVisible[news.id] && news.tldr && (
-                    <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800 text-sm text-gray-800 dark:text-gray-200 prose prose-blue max-w-none dark:prose-invert">
+                    <div className="relative mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800 prose prose-blue max-w-none dark:prose-invert">
+                      {/* Copy feedback state */}
+                      {(() => {
+                        const [copied, setCopied] = useState(false);
+                        const handleCopy = (e: React.MouseEvent) => {
+                          e.stopPropagation();
+                          if (news.tldr) {
+                            navigator.clipboard.writeText(news.tldr);
+                            setCopied(true);
+                            setTimeout(() => setCopied(false), 1500);
+                          }
+                        };
+                        return (
+                          <>
+                            <button
+                              className="absolute top-0 right-0 p-2 m-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                              title={copied ? 'Copied!' : 'Copy TLDR'}
+                              onClick={handleCopy}
+                            >
+                              <Copy size={18} />
+                            </button>
+                            {copied && (
+                              <span className="absolute top-0 right-12 mt-2 px-2 py-1 bg-green-500 text-white text-xs rounded shadow">Copied!</span>
+                            )}
+                          </>
+                        );
+                      })()}
                       <ReactMarkdown>{news.tldr}</ReactMarkdown>
                     </div>
                   )}

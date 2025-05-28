@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Volume2, Bookmark, BookmarkCheck, FileText, ChevronDown, ChevronUp } from 'lucide-react';
+import { Volume2, Bookmark, BookmarkCheck, FileText, ChevronDown, ChevronUp, Copy } from 'lucide-react';
 import { NewsItem as NewsItemType } from '../../types';
 import Card, { CardContent } from '../ui/Card';
 import { useNewsStore } from '../../store/newsStore';
@@ -115,19 +115,47 @@ const NewsItem: React.FC<NewsItemProps> = ({
               </div>
               
               {showTLDR && (
-                <div className="text-sm text-gray-700 dark:text-gray-300 prose prose-blue max-w-none dark:prose-invert">
-                  {isTLDRLoading ? (
-                    <div className="flex items-center space-x-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                      <span>Generating TLDR summary...</span>
-                    </div>
-                  ) : item.tldr ? (
-                    <ReactMarkdown>{item.tldr}</ReactMarkdown>
-                  ) : (
-                    <p className="text-gray-500 dark:text-gray-400 italic">
-                      Click the TLDR button to generate a summary
-                    </p>
-                  )}
+                <div className="relative">
+                  {/* Copy feedback state */}
+                  {(() => {
+                    const [copied, setCopied] = useState(false);
+                    const handleCopy = (e: React.MouseEvent) => {
+                      e.stopPropagation();
+                      if (item.tldr) {
+                        navigator.clipboard.writeText(item.tldr);
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 1500);
+                      }
+                    };
+                    return (
+                      <>
+                        <button
+                          className="absolute top-0 right-0 p-2 m-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                          title={copied ? 'Copied!' : 'Copy TLDR'}
+                          onClick={handleCopy}
+                        >
+                          <Copy size={18} />
+                        </button>
+                        {copied && (
+                          <span className="absolute top-0 right-12 mt-2 px-2 py-1 bg-green-500 text-white text-xs rounded shadow">Copied!</span>
+                        )}
+                      </>
+                    );
+                  })()}
+                  <div className="prose prose-blue max-w-none dark:prose-invert">
+                    {isTLDRLoading ? (
+                      <div className="flex items-center space-x-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                        <span>Generating TLDR summary...</span>
+                      </div>
+                    ) : item.tldr ? (
+                      <ReactMarkdown>{item.tldr}</ReactMarkdown>
+                    ) : (
+                      <p className="italic">
+                        Click the TLDR button to generate a summary
+                      </p>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

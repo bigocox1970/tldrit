@@ -5,7 +5,7 @@ import { useAuthStore } from '../store/authStore';
 import Card, { CardContent } from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import ReactMarkdown from 'react-markdown';
-import { Volume2 } from 'lucide-react';
+import { Volume2, Copy } from 'lucide-react';
 import { Summary } from '../types';
 
 const SavedPage: React.FC = () => {
@@ -15,6 +15,7 @@ const SavedPage: React.FC = () => {
   const [selectedSummary, setSelectedSummary] = useState<string | null>(null);
   const [audioLoading, setAudioLoading] = useState<{ [id: string]: boolean }>({});
   const [audioPlaying, setAudioPlaying] = useState<{ [id: string]: boolean }>({});
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const audioRefs = React.useRef<{ [id: string]: HTMLAudioElement | null }>({});
   
   useEffect(() => {
@@ -149,8 +150,34 @@ const SavedPage: React.FC = () => {
               </h3>
               
               {selectedSummary === summary.id ? (
-                <div className="prose dark:prose-invert max-w-none">
-                  <ReactMarkdown>{summary.summary}</ReactMarkdown>
+                <div className="relative">
+                  <button
+                    className="absolute top-0 right-0 p-2 m-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                    title={copiedId === summary.id ? 'Copied!' : 'Copy summary'}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const textToCopy = summary.summary
+                        .split('\n')
+                        .filter(line => !/^#+ /.test(line.trim()))
+                        .join('\n');
+                      navigator.clipboard.writeText(textToCopy);
+                      setCopiedId(summary.id);
+                      setTimeout(() => setCopiedId(null), 1500);
+                    }}
+                  >
+                    <Copy size={20} />
+                  </button>
+                  {copiedId === summary.id && (
+                    <span className="absolute top-0 right-12 mt-2 px-2 py-1 bg-green-500 text-white text-xs rounded shadow">Copied!</span>
+                  )}
+                  <div className="prose dark:prose-invert max-w-none">
+                    <ReactMarkdown>
+                      {summary.summary
+                        .split('\n')
+                        .filter(line => !/^#+ /.test(line.trim()))
+                        .join('\n')}
+                    </ReactMarkdown>
+                  </div>
                 </div>
               ) : (
                 <p className="text-gray-600 dark:text-gray-400 line-clamp-2">

@@ -8,6 +8,7 @@ import Input from '../ui/Input';
 import Toggle from '../ui/Toggle';
 import Slider from '../ui/Slider';
 import Card, { CardContent } from '../ui/Card';
+import ReactMarkdown from 'react-markdown';
 
 const SummarizeForm: React.FC = () => {
   const { createSummary, currentSummary, isLoading, summaries } = useSummaryStore();
@@ -46,6 +47,10 @@ const SummarizeForm: React.FC = () => {
       return;
     }
     
+    // Clear the current summary before starting a new one
+    useSummaryStore.setState({ currentSummary: null });
+    setShowOverlay(true);
+    
     try {
       if (inputType === 'text' && !content.trim()) {
         setError('Please enter some text to summarize');
@@ -76,8 +81,6 @@ const SummarizeForm: React.FC = () => {
         summaryLevel,
         isEli5,
       });
-      
-      setShowOverlay(true);
     } catch {
       setError('An error occurred while creating the summary');
     }
@@ -367,7 +370,7 @@ Paste your, meeting notes, revision, or any long boring document here to TLDRit!
       </Card>
 
       {/* Summary Overlay */}
-      {showOverlay && currentSummary && (
+      {showOverlay && (
         <div className="absolute left-0 right-0 top-0 z-50 flex justify-center bg-black bg-opacity-50" style={{ pointerEvents: 'auto' }}>
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-2xl w-full max-h-[80vh] flex flex-col relative mt-4" style={{ zIndex: 100 }}>
             <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
@@ -379,11 +382,17 @@ Paste your, meeting notes, revision, or any long boring document here to TLDRit!
                 <X size={20} />
               </button>
             </div>
-            
             <div className="p-4 overflow-y-auto flex-1">
-              <p className="whitespace-pre-line">{currentSummary.summary}</p>
+              {currentSummary ? (
+                <div className="prose dark:prose-invert max-w-none">
+                  <ReactMarkdown>{currentSummary.summary}</ReactMarkdown>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-40 text-lg text-gray-500">
+                  Generating summary...
+                </div>
+              )}
             </div>
-            
             <div className="p-4 border-t border-gray-200 dark:border-gray-700 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -397,7 +406,6 @@ Paste your, meeting notes, revision, or any long boring document here to TLDRit!
                   labels={['Title + 1 line', 'Short', 'Long', 'Full']}
                 />
               </div>
-              
               <div className="inline-flex items-center">
                 <Toggle
                   isOn={isEli5}
@@ -405,7 +413,6 @@ Paste your, meeting notes, revision, or any long boring document here to TLDRit!
                   rightLabel={eli5Label}
                 />
               </div>
-              
               <div className="flex justify-end space-x-3">
                 <Button
                   variant="outline"
@@ -413,7 +420,6 @@ Paste your, meeting notes, revision, or any long boring document here to TLDRit!
                 >
                   Close
                 </Button>
-                
                 <Button
                   variant="primary"
                   onClick={() => handleRegenerateTLDR()}

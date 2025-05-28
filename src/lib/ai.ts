@@ -68,6 +68,20 @@ export async function summarizeContent(content: string, options: SummarizeOption
   const summaryLength = getSummaryLengthFromLevel(summaryLevel);
   
   // Create enhanced system message for news articles
+  const markdownInstructions = `
+- Use markdown for ALL structure.
+- For every list of facts, key points, or steps, use markdown bullet points (lines starting with '- ').
+- Add exactly one blank line between each paragraph, heading, and bullet point for readability.
+- Never add more than one blank line in a row.
+- Never use plain lines for lists—always use markdown list syntax.
+- If you list more than one fact, always use markdown bullet points.
+- Use markdown headings (##, ###) for sections.
+- Use numbered lists (1., 2., etc.) where appropriate.
+- Use short paragraphs for explanations.
+- Do NOT repeat the title or headline.
+- Do NOT include any heading like 'TLDR Summary' or similar in your output.
+- Make the summary easy to scan and visually appealing.`;
+
   const newsSpecificInstructions = isNewsArticle 
     ? `EXAMPLE MARKDOWN OUTPUT (copy this structure):
 
@@ -89,19 +103,8 @@ export async function summarizeContent(content: string, options: SummarizeOption
 
 You are creating a TLDR summary for a news article.
 
-- Use markdown for ALL structure.
-- For every list of facts, key points, or steps, use markdown bullet points (lines starting with '- ').
-- Add exactly one blank line between each paragraph, heading, and bullet point for readability.
-- Never add more than one blank line in a row.
-- Never use plain lines for lists—always use markdown list syntax.
-- If you list more than one fact, always use markdown bullet points.
-- Use markdown headings (##, ###) for sections.
-- Use numbered lists (1., 2., etc.) where appropriate.
-- Use short paragraphs for explanations.
-- Do NOT repeat the title or headline.
-- Do NOT include any heading like 'TLDR Summary' or similar in your output.
-- Make the summary easy to scan and visually appealing.`
-    : "You are an expert at creating concise, accurate summaries while preserving key information. Focus on main points and maintain the original tone.";
+${markdownInstructions}`
+    : `You are an expert at creating concise, accurate summaries while preserving key information. Focus on main points and maintain the original tone.\n${markdownInstructions}`;
   
   // Create system message
   const explicitEliPrompt = isEli5 ? `${getEliPrompt(eli5Level || 5)} The higher the age, the more advanced and detailed the explanation should be.` : '';
@@ -112,7 +115,7 @@ You are creating a TLDR summary for a news article.
   // Create enhanced user message for news articles
   const newsPrompt = isNewsArticle 
     ? `Create a TLDR summary of the following news article content.\n\n- Do NOT include or repeat the title/headline.\n- Do NOT include any heading like 'TLDR Summary' or similar.\n- Focus on the main facts, events, and key details from the article body.\n- Provide context and insights in about ${summaryLength} words.\n- Use markdown formatting for structure: headings, subheadings, bullet points, numbered lists, and short paragraphs.\n- After each heading, list, and paragraph, add a blank line for clear separation and maximum readability.\n- Make the summary visually appealing and easy to scan.`
-    : `Summarize the following in about ${summaryLength} words:`;
+    : `Summarize the following in about ${summaryLength} words:\n\n- Use markdown formatting for structure: headings, subheadings, bullet points, numbered lists, and short paragraphs.\n- After each heading, list, and paragraph, add a blank line for clear separation and maximum readability.\n- Make the summary visually appealing and easy to scan.`;
   
   // Create user message
   const userMessage = isEli5
