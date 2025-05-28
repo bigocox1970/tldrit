@@ -29,6 +29,8 @@ export interface NewsItem {
   imageUrl?: string;
   audioUrl?: string;
   tldr?: string;
+  inPlaylist?: boolean;
+  bookmarked?: boolean;
 }
 
 export interface SummaryRequest {

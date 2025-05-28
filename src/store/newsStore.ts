@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { NewsItem, UserInterest } from '../types';
-import { getAvailableInterests, saveUserInterests } from '../lib/supabase';
+import { getAvailableInterests, saveUserInterests, getUserNewsMeta, upsertUserNewsMeta, updateNewsTLDR, updateNewsAudio } from '../lib/supabase';
 import { useAuthStore } from './authStore';
 import { generateAudio, summarizeUrl } from '../lib/ai';
 
@@ -24,6 +24,8 @@ interface NewsState {
   generateAudioForNewsItem: (newsItemId: string) => Promise<void>;
   generateTLDRForNewsItem: (newsItemId: string, options?: TLDROptions) => Promise<void>;
   refreshNews: () => Promise<void>;
+  toggleBookmark: (newsItemId: string) => void;
+  togglePlaylist: (newsItemId: string) => void;
 }
 
 export const useNewsStore = create<NewsState>((set, get) => ({
@@ -97,6 +99,19 @@ export const useNewsStore = create<NewsState>((set, get) => ({
         error: null,
         isFetching: false
       });
+      
+      // Merge per-user meta
+      if (user) {
+        const { data: meta } = await getUserNewsMeta(user.id);
+        if (meta) {
+          set(state => ({
+            newsItems: state.newsItems.map(item => {
+              const metaItem = meta.find((m: any) => m.news_id === item.id);
+              return metaItem ? { ...item, bookmarked: metaItem.bookmarked, inPlaylist: metaItem.inPlaylist } : item;
+            })
+          }));
+        }
+      }
     } catch (err) {
       console.error('Error fetching news items:', err);
       set({ 
@@ -205,7 +220,7 @@ export const useNewsStore = create<NewsState>((set, get) => ({
     const newsItem = get().newsItems.find(item => item.id === newsItemId);
     if (!newsItem) return;
 
-    // Check if TLDR already exists
+    // Check if TLDR already exists in Supabase
     if (newsItem.tldr) {
       return;
     }
@@ -221,16 +236,20 @@ export const useNewsStore = create<NewsState>((set, get) => ({
       
       // Use the existing summarizeUrl function from ai.ts with options
       const tldrSummary = await summarizeUrl(newsItem.sourceUrl, user.isPremium, options);
+      // Update shared TLDR in Supabase
+      await updateNewsTLDR(newsItemId, tldrSummary);
       
       set(state => ({
         newsItems: state.newsItems.map(item => 
           item.id === newsItemId 
-            ? { ...item, tldr: tldrSummary } 
+            ? { ...item, tldr: tldrSummary, inPlaylist: true } 
             : item
         ),
         tldrLoading: { ...state.tldrLoading, [newsItemId]: false },
         error: null,
       }));
+      // Add to playlist for this user
+      await upsertUserNewsMeta(user.id, newsItemId, { inPlaylist: true });
     } catch (error) {
       console.error('Error generating TLDR:', error);
       set(state => ({
@@ -243,5 +262,37 @@ export const useNewsStore = create<NewsState>((set, get) => ({
   refreshNews: async () => {
     // Simply call fetchNewsItems to refresh using Netlify function
     await get().fetchNewsItems();
+  },
+
+  toggleBookmark: async (newsItemId: string) => {
+    const user = useAuthStore.getState().user;
+    if (!user) return;
+    set(state => ({
+      newsItems: state.newsItems.map(item =>
+        item.id === newsItemId
+          ? { ...item, bookmarked: !item.bookmarked }
+          : item
+      )
+    }));
+    const item = get().newsItems.find(item => item.id === newsItemId);
+    if (item) {
+      await upsertUserNewsMeta(user.id, newsItemId, { bookmarked: !item.bookmarked });
+    }
+  },
+
+  togglePlaylist: async (newsItemId: string) => {
+    const user = useAuthStore.getState().user;
+    if (!user) return;
+    set(state => ({
+      newsItems: state.newsItems.map(item =>
+        item.id === newsItemId
+          ? { ...item, inPlaylist: !item.inPlaylist }
+          : item
+      )
+    }));
+    const item = get().newsItems.find(item => item.id === newsItemId);
+    if (item) {
+      await upsertUserNewsMeta(user.id, newsItemId, { inPlaylist: !item.inPlaylist });
+    }
   },
 }));

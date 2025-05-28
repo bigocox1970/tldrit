@@ -136,3 +136,36 @@ export async function getAvailableInterests() {
   
   return { data, error };
 }
+
+// --- USER NEWS META (per-user bookmarks/playlist) ---
+export async function getUserNewsMeta(userId: string) {
+  const { data, error } = await supabase
+    .from('user_news_meta')
+    .select('*')
+    .eq('user_id', userId);
+  return { data, error };
+}
+
+export async function upsertUserNewsMeta(userId: string, newsId: string, meta: { bookmarked?: boolean; inPlaylist?: boolean }) {
+  const { data, error } = await supabase
+    .from('user_news_meta')
+    .upsert({ user_id: userId, news_id: newsId, ...meta }, { onConflict: 'user_id,news_id' });
+  return { data, error };
+}
+
+// --- SHARED NEWS TLDR/AUDIO ---
+export async function updateNewsTLDR(newsId: string, tldr: string) {
+  const { data, error } = await supabase
+    .from('news')
+    .update({ tldr })
+    .eq('id', newsId);
+  return { data, error };
+}
+
+export async function updateNewsAudio(newsId: string, audioUrl: string) {
+  const { data, error } = await supabase
+    .from('news')
+    .update({ audio_url: audioUrl })
+    .eq('id', newsId);
+  return { data, error };
+}

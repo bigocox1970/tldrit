@@ -1,23 +1,46 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Headphones, Copy } from 'lucide-react';
 import { useSummaryStore } from '../../store/summaryStore';
 import { useAuthStore } from '../../store/authStore';
-import Button from '../ui/Button';
 import Card, { CardContent, CardHeader, CardFooter } from '../ui/Card';
 
 const SummaryResult: React.FC = () => {
   const { currentSummary, generateAudioForSummary, isLoading } = useSummaryStore();
   const { isAuthenticated, user } = useAuthStore();
-  const [copied, setCopied] = React.useState(false);
+  const [copied, setCopied] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [audioLoading, setAudioLoading] = useState(false);
+  const [audioPlaying, setAudioPlaying] = useState(false);
   
   if (!currentSummary) {
     return null;
   }
   
-  const handleGenerateAudio = () => {
-    if (currentSummary) {
-      generateAudioForSummary(currentSummary.id);
+  const handleHeadphonesClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!currentSummary) return;
+    if (currentSummary.audioUrl) {
+      // Play audio
+      if (!audioRef.current) {
+        audioRef.current = new Audio(currentSummary.audioUrl);
+        audioRef.current.addEventListener('ended', () => setAudioPlaying(false));
+      }
+      if (audioPlaying) {
+        audioRef.current.pause();
+        setAudioPlaying(false);
+      } else {
+        audioRef.current.play();
+        setAudioPlaying(true);
+      }
+    } else {
+      // Generate audio
+      setAudioLoading(true);
+      try {
+        await generateAudioForSummary(currentSummary.id);
+      } finally {
+        setAudioLoading(false);
+      }
     }
   };
   
@@ -53,28 +76,14 @@ const SummaryResult: React.FC = () => {
         </div>
         
         <div className="flex space-x-2">
-          {!currentSummary.audioUrl && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleGenerateAudio}
-              disabled={isLoading || !isAuthenticated || (!user?.isPremium && currentSummary.summary.length > 300)}
-            >
-              <Headphones size={16} className="mr-1" />
-              {isLoading ? 'Generating...' : 'Generate Audio'}
-            </Button>
-          )}
-          
-          {currentSummary.audioUrl && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => window.open(currentSummary.audioUrl, '_blank')}
-            >
-              <Headphones size={16} className="mr-1" />
-              Listen
-            </Button>
-          )}
+          <button
+            onClick={handleHeadphonesClick}
+            disabled={audioLoading || isLoading || !isAuthenticated || (!user?.isPremium && currentSummary.summary.length > 300)}
+            className={`p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${audioLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+            title={currentSummary.audioUrl ? (audioPlaying ? 'Pause audio' : 'Play audio') : (audioLoading ? 'Generating audio...' : 'Generate and play audio')}
+          >
+            <Headphones size={20} className={audioPlaying ? 'text-green-600 animate-pulse' : currentSummary.audioUrl ? 'text-blue-500' : 'text-gray-500 dark:text-gray-400'} />
+          </button>
         </div>
       </CardFooter>
     </Card>

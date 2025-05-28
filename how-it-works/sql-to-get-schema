@@ -1,0 +1,51 @@
+DO $$ 
+DECLARE 
+    r RECORD;
+    col RECORD;
+    pol RECORD;
+    md TEXT := '';
+BEGIN
+    -- Loop through all user tables in the public schema
+    FOR r IN 
+        SELECT table_name 
+        FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+          AND table_type = 'BASE TABLE'
+    LOOP
+        md := md || '## Table: `' || r.table_name || '`' || E'\n\n';
+        md := md || '| Column | Data Type | Nullable |' || E'\n';
+        md := md || '|--------|-----------|----------|' || E'\n';
+
+        -- Get all columns
+        FOR col IN 
+            SELECT column_name, data_type, is_nullable
+            FROM information_schema.columns
+            WHERE table_name = r.table_name 
+              AND table_schema = 'public'
+        LOOP
+            md := md || '| `' || col.column_name || '` | `' || col.data_type || '` | `' || col.is_nullable || '` |' || E'\n';
+        END LOOP;
+
+        -- Add RLS policies if any
+        md := md || E'\n**Row-Level Security Policies**:\n\n';
+
+        FOR pol IN 
+            SELECT pol.policyname, pol.permissive, pol.cmd, pol.roles, pg_get_expr(pol.qual, pol.polrelid) AS condition, pg_get_expr(pol.with_check, pol.polrelid) AS check_expr
+            FROM pg_policies pol
+            WHERE pol.schemaname = 'public' 
+              AND pol.tablename = r.table_name
+        LOOP
+            md := md || '- `' || pol.policyname || '` on `' || UPPER(pol.cmd) || '` for roles `' || array_to_string(pol.roles, ', ') || '`' || E'\n';
+            IF pol.condition IS NOT NULL THEN
+                md := md || '  - Condition: `' || pol.condition || '`' || E'\n';
+            END IF;
+            IF pol.check_expr IS NOT NULL THEN
+                md := md || '  - With Check: `' || pol.check_expr || '`' || E'\n';
+            END IF;
+        END LOOP;
+
+        md := md || E'\n---\n\n';
+    END LOOP;
+
+    RAISE NOTICE '%', md;
+END $$;

@@ -1,58 +1,78 @@
-import React, { useState } from 'react';
-import { Volume2, Bookmark, BookmarkCheck, FileText, ChevronDown, ChevronUp, Copy } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Volume2, Bookmark, BookmarkCheck, FileText, Copy, Headphones, ChevronDown } from 'lucide-react';
 import { NewsItem as NewsItemType } from '../../types';
 import Card, { CardContent } from '../ui/Card';
 import { useNewsStore } from '../../store/newsStore';
-import { useAuthStore } from '../../store/authStore';
 import ReactMarkdown from 'react-markdown';
+import { useAuthStore } from '../../store/authStore';
 
 interface NewsItemProps {
   item: NewsItemType;
-  isSaved?: boolean;
-  onSave?: () => void;
 }
 
-const NewsItem: React.FC<NewsItemProps> = ({ 
-  item, 
-  isSaved = false,
-  onSave,
-}) => {
-  const { generateAudioForNewsItem, generateTLDRForNewsItem, isLoading, tldrLoading } = useNewsStore();
+const NewsItem: React.FC<NewsItemProps> = ({ item }) => {
+  const { generateAudioForNewsItem, tldrLoading } = useNewsStore();
   const { user } = useAuthStore();
-  const [showTLDR, setShowTLDR] = useState(false);
-  
-  const handleGenerateAudio = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    generateAudioForNewsItem(item.id);
-  };
-  
-  const handleSave = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (onSave) {
-      onSave();
+  const localStorageKey = `tldr-open-${item.id}`;
+  const [showTLDR, setShowTLDR] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem(localStorageKey) === 'true';
     }
-  };
-
-  const handleGenerateTLDR = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    generateTLDRForNewsItem(item.id, {
-      summaryLevel: 2,
-      isEli5: false,
-      eli5Level: undefined
-    });
-    setShowTLDR(true);
-  };
-
-  const handleToggleTLDR = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setShowTLDR(!showTLDR);
-  };
+    return false;
+  });
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(localStorageKey, showTLDR ? 'true' : 'false');
+    }
+  }, [showTLDR, localStorageKey]);
+  const [copied, setCopied] = useState(false);
+  const audioRefs = useRef<{ [id: string]: HTMLAudioElement | null }>({});
+  const [audioLoading, setAudioLoading] = useState<{ [id: string]: boolean }>({});
+  const [audioPlaying, setAudioPlaying] = useState<{ [id: string]: boolean }>({});
   
   const handleClick = () => {
     window.open(item.sourceUrl, '_blank');
   };
 
   const isTLDRLoading = tldrLoading[item.id] || false;
+
+  const handleSpeakerClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    // Stop any currently playing audio
+    Object.entries(audioRefs.current).forEach(([id, audio]) => {
+      if (audio && id !== item.id) {
+        audio.pause();
+        audio.currentTime = 0;
+        setAudioPlaying(prev => ({ ...prev, [id]: false }));
+      }
+    });
+
+    if (item.audioUrl) {
+      // Initialize audio if not already done
+      if (!audioRefs.current[item.id]) {
+        audioRefs.current[item.id] = new Audio(item.audioUrl);
+        audioRefs.current[item.id]?.addEventListener('ended', () => {
+          setAudioPlaying(prev => ({ ...prev, [item.id]: false }));
+        });
+      }
+      // Toggle play/pause
+      if (audioPlaying[item.id]) {
+        audioRefs.current[item.id]?.pause();
+        setAudioPlaying(prev => ({ ...prev, [item.id]: false }));
+      } else {
+        audioRefs.current[item.id]?.play();
+        setAudioPlaying(prev => ({ ...prev, [item.id]: true }));
+      }
+    } else {
+      // Generate audio
+      setAudioLoading(prev => ({ ...prev, [item.id]: true }));
+      try {
+        await generateAudioForNewsItem(item.id);
+      } finally {
+        setAudioLoading(prev => ({ ...prev, [item.id]: false }));
+      }
+    }
+  };
 
   return (
     <Card className="cursor-pointer hover:shadow-md transition-shadow">
@@ -102,46 +122,82 @@ const NewsItem: React.FC<NewsItemProps> = ({
                     TLDR Summary
                   </span>
                 </div>
-                <button
-                  onClick={handleToggleTLDR}
-                  className="p-1 rounded hover:bg-blue-100 dark:hover:bg-blue-800"
-                >
-                  {showTLDR ? (
-                    <ChevronUp size={16} className="text-blue-600 dark:text-blue-400" />
-                  ) : (
-                    <ChevronDown size={16} className="text-blue-600 dark:text-blue-400" />
-                  )}
-                </button>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => setShowTLDR((prev) => !prev)}
+                    className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                    title={showTLDR ? 'Hide TLDR' : 'Show TLDR'}
+                  >
+                    <ChevronDown size={20} className={`text-gray-500 dark:text-gray-400 transition-transform ${showTLDR ? '' : 'rotate-180'}`} />
+                  </button>
+                </div>
               </div>
               
               {showTLDR && (
-                <div className="relative">
-                  {/* Copy feedback state */}
-                  {(() => {
-                    const [copied, setCopied] = useState(false);
-                    const handleCopy = (e: React.MouseEvent) => {
-                      e.stopPropagation();
-                      if (item.tldr) {
-                        navigator.clipboard.writeText(item.tldr);
-                        setCopied(true);
-                        setTimeout(() => setCopied(false), 1500);
-                      }
-                    };
-                    return (
-                      <>
-                        <button
-                          className="absolute top-0 right-0 p-2 m-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                          title={copied ? 'Copied!' : 'Copy TLDR'}
-                          onClick={handleCopy}
-                        >
-                          <Copy size={18} />
-                        </button>
-                        {copied && (
-                          <span className="absolute top-0 right-12 mt-2 px-2 py-1 bg-green-500 text-white text-xs rounded shadow">Copied!</span>
+                <div>
+                  <div className="flex items-center mb-2 mt-4">
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={handleSpeakerClick}
+                        disabled={audioLoading[item.id]}
+                        className={`p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${audioLoading[item.id] ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        title={audioLoading[item.id]
+                          ? 'Generating audio...'
+                          : audioPlaying[item.id]
+                          ? 'Pause audio'
+                          : item.audioUrl
+                          ? 'Play audio'
+                          : 'Generate audio'}
+                      >
+                        <Volume2
+                          size={20}
+                          className={audioLoading[item.id]
+                            ? 'text-green-700'
+                            : audioPlaying[item.id]
+                            ? 'text-green-600 animate-pulse'
+                            : item.audioUrl
+                            ? 'text-blue-500'
+                            : 'text-gray-500 dark:text-gray-400'}
+                        />
+                      </button>
+                      <button
+                        onClick={() => useNewsStore.getState().toggleBookmark(item.id)}
+                        className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                        title={item.bookmarked ? 'Remove bookmark' : 'Bookmark this TLDR'}
+                      >
+                        {item.bookmarked ? (
+                          <BookmarkCheck size={20} className="text-green-500" />
+                        ) : (
+                          <Bookmark size={20} className="text-gray-500 dark:text-gray-400" />
                         )}
-                      </>
-                    );
-                  })()}
+                      </button>
+                      <button
+                        onClick={() => useNewsStore.getState().togglePlaylist(item.id)}
+                        className={`p-2 rounded-full hover:bg-gray-100 dark:bg-gray-800 transition-colors ${item.inPlaylist ? 'bg-purple-100 dark:bg-purple-900/20' : ''}`}
+                        title={item.inPlaylist ? 'Remove from Listen playlist' : 'Add to Listen playlist'}
+                      >
+                        <Headphones size={20} className={item.inPlaylist ? 'text-purple-600 dark:text-purple-400' : 'text-gray-500 dark:text-gray-400'} />
+                      </button>
+                    </div>
+                    <div className="flex-1" />
+                    <button
+                      className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                      title={copied ? 'Copied!' : 'Copy TLDR'}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (item.tldr) {
+                          navigator.clipboard.writeText(item.tldr);
+                          setCopied(true);
+                          setTimeout(() => setCopied(false), 1500);
+                        }
+                      }}
+                    >
+                      <Copy size={18} />
+                    </button>
+                    {copied && (
+                      <span className="ml-2 px-2 py-1 bg-green-500 text-white text-xs rounded shadow">Copied!</span>
+                    )}
+                  </div>
                   <div className="prose prose-blue max-w-none dark:prose-invert">
                     {isTLDRLoading ? (
                       <div className="flex items-center space-x-2">
@@ -162,57 +218,31 @@ const NewsItem: React.FC<NewsItemProps> = ({
           )}
           
           <div className="flex justify-between items-center">
-            <div className="flex space-x-2">
+            <div className="flex items-center">
               <button
-                onClick={handleSave}
-                className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                title={isSaved ? "Remove from saved" : "Save article"}
+                onClick={item.tldr ? () => setShowTLDR(!showTLDR) : (e) => {
+                  e.stopPropagation();
+                  if (user) {
+                    useNewsStore.getState().generateTLDRForNewsItem(item.id);
+                    setShowTLDR(true);
+                  }
+                }}
+                disabled={tldrLoading[item.id] || !user}
+                className={`flex items-center space-x-1 px-3 py-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${tldrLoading[item.id] || !user ? 'opacity-50 cursor-not-allowed' : ''}`}
+                title={!user ? "Login required for TLDR" : item.tldr ? "Toggle TLDR" : "Generate TLDR"}
               >
-                {isSaved ? (
-                  <BookmarkCheck size={20} className="text-green-500" />
+                {tldrLoading[item.id] ? (
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
                 ) : (
-                  <Bookmark size={20} className="text-gray-500 dark:text-gray-400" />
+                  <FileText 
+                    size={20} 
+                    className={item.tldr ? 'text-blue-500' : 'text-gray-500 dark:text-gray-400'} 
+                  />
                 )}
+                <span className={`text-sm font-medium ${item.tldr ? 'text-blue-500' : 'text-gray-500 dark:text-gray-400'}`}>
+                  TLDR
+                </span>
               </button>
-              
-              <button
-                onClick={handleGenerateAudio}
-                disabled={isLoading || !!item.audioUrl}
-                className={`
-                  p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors
-                  ${isLoading || !!item.audioUrl ? 'opacity-50 cursor-not-allowed' : ''}
-                `}
-                title={item.audioUrl ? "Audio available" : "Generate audio"}
-              >
-                <Volume2
-                  size={20}
-                  className={item.audioUrl ? 'text-blue-500' : 'text-gray-500 dark:text-gray-400'}
-                />
-              </button>
-
-              <div className="flex items-center">
-                <button
-                  onClick={item.tldr ? handleToggleTLDR : handleGenerateTLDR}
-                  disabled={isTLDRLoading || !user}
-                  className={`
-                    flex items-center space-x-1 px-3 py-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors
-                    ${isTLDRLoading || !user ? 'opacity-50 cursor-not-allowed' : ''}
-                  `}
-                  title={!user ? "Login required for TLDR" : item.tldr ? "Toggle TLDR" : "Generate TLDR"}
-                >
-                  {isTLDRLoading ? (
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
-                  ) : (
-                    <FileText 
-                      size={20} 
-                      className={item.tldr ? 'text-blue-500' : 'text-gray-500 dark:text-gray-400'} 
-                    />
-                  )}
-                  <span className={`text-sm font-medium ${item.tldr ? 'text-blue-500' : 'text-gray-500 dark:text-gray-400'}`}>
-                    TLDR
-                  </span>
-                </button>
-              </div>
             </div>
 
             <button
