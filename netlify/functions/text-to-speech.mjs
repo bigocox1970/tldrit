@@ -7,6 +7,7 @@ const supabase = createClient(
 );
 
 export const handler = async function(event, context) {
+  console.log('TTS function invoked');
   // Handle CORS
   const headers = {
     'Access-Control-Allow-Origin': '*',
