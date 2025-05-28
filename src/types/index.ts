@@ -25,10 +25,10 @@ export interface NewsItem {
   sourceUrl: string;
   category: string;
   summary: string;
+  tldr?: string; // AI-generated TLDR (long summary)
   publishedAt: string;
   imageUrl?: string;
   audioUrl?: string;
-  tldr?: string;
   inPlaylist?: boolean;
   bookmarked?: boolean;
 }

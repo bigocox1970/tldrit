@@ -12,6 +12,7 @@ const NewsCarousel: React.FC = () => {
   const touchStartX = useRef<number | null>(null);
   const touchEndX = useRef<number | null>(null);
   const [tldrVisible, setTldrVisible] = useState<{ [id: string]: boolean }>({});
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchNewsItems();
@@ -66,6 +67,9 @@ const NewsCarousel: React.FC = () => {
   const showLeft = currentIndex > 0;
   const showRight = currentIndex < newsItems.length - 1;
   const news = newsItems[displayIndex];
+
+  // Use tldr for TLDR display
+  const tldrText = news.tldr;
 
   return (
     <div className="py-4">
@@ -139,7 +143,7 @@ const NewsCarousel: React.FC = () => {
                     className="mt-2 flex items-center gap-1 px-3 py-1 rounded bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition"
                     onClick={async (e) => {
                       e.stopPropagation();
-                      if (!news.tldr) {
+                      if (!tldrText) {
                         await generateTLDRForNewsItem(news.id);
                       }
                       setTldrVisible(v => ({ ...v, [news.id]: !v[news.id] }));
@@ -147,35 +151,24 @@ const NewsCarousel: React.FC = () => {
                   >
                     <FileText size={16} /> TLDR
                   </button>
-                  {tldrVisible[news.id] && news.tldr && (
+                  {tldrVisible[news.id] && tldrText && (
                     <div className="relative mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800 prose prose-blue max-w-none dark:prose-invert">
-                      {/* Copy feedback state */}
-                      {(() => {
-                        const [copied, setCopied] = useState(false);
-                        const handleCopy = (e: React.MouseEvent) => {
+                      <button
+                        className="absolute top-0 right-0 p-2 m-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                        title={copiedId === news.id ? 'Copied!' : 'Copy TLDR'}
+                        onClick={(e) => {
                           e.stopPropagation();
-                          if (news.tldr) {
-                            navigator.clipboard.writeText(news.tldr);
-                            setCopied(true);
-                            setTimeout(() => setCopied(false), 1500);
-                          }
-                        };
-                        return (
-                          <>
-                            <button
-                              className="absolute top-0 right-0 p-2 m-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                              title={copied ? 'Copied!' : 'Copy TLDR'}
-                              onClick={handleCopy}
-                            >
-                              <Copy size={18} />
-                            </button>
-                            {copied && (
-                              <span className="absolute top-0 right-12 mt-2 px-2 py-1 bg-green-500 text-white text-xs rounded shadow">Copied!</span>
-                            )}
-                          </>
-                        );
-                      })()}
-                      <ReactMarkdown>{news.tldr}</ReactMarkdown>
+                          navigator.clipboard.writeText(tldrText);
+                          setCopiedId(news.id);
+                          setTimeout(() => setCopiedId(null), 1500);
+                        }}
+                      >
+                        <Copy size={18} />
+                      </button>
+                      {copiedId === news.id && (
+                        <span className="absolute top-0 right-12 mt-2 px-2 py-1 bg-green-500 text-white text-xs rounded shadow">Copied!</span>
+                      )}
+                      <ReactMarkdown>{tldrText}</ReactMarkdown>
                     </div>
                   )}
                 </div>

@@ -154,10 +154,10 @@ export async function upsertUserNewsMeta(userId: string, newsId: string, meta: {
 }
 
 // --- SHARED NEWS TLDR/AUDIO ---
-export async function updateNewsTLDR(newsId: string, tldr: string) {
+export async function updateNewsTLDR(newsId: string, summary: string) {
   const { data, error } = await supabase
     .from('news')
-    .update({ tldr })
+    .update({ summary })
     .eq('id', newsId);
   return { data, error };
 }

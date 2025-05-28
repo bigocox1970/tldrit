@@ -213,8 +213,17 @@ export const useNewsStore = create<NewsState>((set, get) => ({
     try {
       const audioText = newsItem.tldr || newsItem.summary;
       const audioUrl = await generateAudio(audioText, user.isPremium);
-      // Save audioUrl to Supabase by url_hash
-      await upsertNewsByUrlHash({ url_hash: urlHash, source_url: newsItem.sourceUrl, audio_url: audioUrl });
+      // Minimal required fields for audio upsert (debugging 400 error)
+      const audioUpsertPayload = {
+        url_hash: urlHash,
+        source_url: newsItem.sourceUrl,
+        title: newsItem.title,
+        summary: newsItem.summary,
+        category: newsItem.category,
+        audio_url: audioUrl
+      };
+      console.log('Upserting audio to Supabase:', audioUpsertPayload);
+      await upsertNewsByUrlHash(audioUpsertPayload);
       set(state => ({
         newsItems: state.newsItems.map(item => 
           item.id === newsItemId 
@@ -275,9 +284,17 @@ export const useNewsStore = create<NewsState>((set, get) => ({
       // Use the existing summarizeUrl function from ai.ts with options
       const tldrSummary = await summarizeUrl(newsItem.sourceUrl, user.isPremium, options);
       console.log('[TLDR] LLM returned:', tldrSummary);
-      // Update shared TLDR in Supabase by url_hash
-      const upsertResult = await upsertNewsByUrlHash({ url_hash: urlHash, source_url: newsItem.sourceUrl, tldr: tldrSummary });
-      console.log('[TLDR] Upserted TLDR to Supabase:', upsertResult);
+      // Minimal required fields for TLDR upsert (debugging 400 error)
+      const tldrUpsertPayload = {
+        url_hash: urlHash,
+        source_url: newsItem.sourceUrl,
+        title: newsItem.title,
+        summary: newsItem.summary, // short blurb
+        tldr: tldrSummary,         // long AI TLDR
+        category: newsItem.category
+      };
+      console.log('Upserting TLDR to Supabase:', tldrUpsertPayload);
+      const upsertResult = await upsertNewsByUrlHash(tldrUpsertPayload);
       set(state => ({
         newsItems: state.newsItems.map(item => 
           item.id === newsItemId 
@@ -288,7 +305,9 @@ export const useNewsStore = create<NewsState>((set, get) => ({
         error: null,
       }));
       // Add to playlist for this user
-      await upsertUserNewsMeta(user.id, newsItemId, { inPlaylist: true });
+      if (upsertResult && upsertResult.data && upsertResult.data.id) {
+        await upsertUserNewsMeta(user.id, upsertResult.data.id, { inPlaylist: true });
+      }
       console.log('[TLDR] Updated local state and playlist');
     } catch (error) {
       console.error('[TLDR] Error generating TLDR:', error);
@@ -315,8 +334,8 @@ export const useNewsStore = create<NewsState>((set, get) => ({
       )
     }));
     const item = get().newsItems.find(item => item.id === newsItemId);
-    if (item) {
-      await upsertUserNewsMeta(user.id, newsItemId, { bookmarked: !item.bookmarked });
+    if (item && item.id) {
+      await upsertUserNewsMeta(user.id, item.id, { bookmarked: !item.bookmarked });
     }
   },
 
@@ -331,8 +350,8 @@ export const useNewsStore = create<NewsState>((set, get) => ({
       )
     }));
     const item = get().newsItems.find(item => item.id === newsItemId);
-    if (item) {
-      await upsertUserNewsMeta(user.id, newsItemId, { inPlaylist: !item.inPlaylist });
+    if (item && item.id) {
+      await upsertUserNewsMeta(user.id, item.id, { inPlaylist: !item.inPlaylist });
     }
   },
 }));
