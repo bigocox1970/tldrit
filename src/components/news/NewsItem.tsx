@@ -68,6 +68,17 @@ const NewsItem: React.FC<NewsItemProps> = ({ item }) => {
       setAudioLoading(prev => ({ ...prev, [item.id]: true }));
       try {
         await generateAudioForNewsItem(item.id);
+        // After generating, auto-play if audioUrl is now set
+        if (item.audioUrl) {
+          if (!audioRefs.current[item.id]) {
+            audioRefs.current[item.id] = new Audio(item.audioUrl);
+            audioRefs.current[item.id]?.addEventListener('ended', () => {
+              setAudioPlaying(prev => ({ ...prev, [item.id]: false }));
+            });
+          }
+          audioRefs.current[item.id]?.play();
+          setAudioPlaying(prev => ({ ...prev, [item.id]: true }));
+        }
       } finally {
         setAudioLoading(prev => ({ ...prev, [item.id]: false }));
       }
@@ -140,7 +151,15 @@ const NewsItem: React.FC<NewsItemProps> = ({ item }) => {
                       <button
                         onClick={handleSpeakerClick}
                         disabled={audioLoading[item.id]}
-                        className={`p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${audioLoading[item.id] ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        className={`ml-2 p-2 rounded-full border border-gray-200 dark:border-gray-700 transition-colors
+                          ${audioLoading[item.id]
+                            ? 'animate-pulse bg-green-200'
+                            : audioPlaying[item.id]
+                            ? 'bg-green-600'
+                            : item.audioUrl
+                            ? 'bg-green-500'
+                            : 'bg-gray-200 dark:bg-gray-700'}
+                        `}
                         title={audioLoading[item.id]
                           ? 'Generating audio...'
                           : audioPlaying[item.id]
@@ -154,9 +173,9 @@ const NewsItem: React.FC<NewsItemProps> = ({ item }) => {
                           className={audioLoading[item.id]
                             ? 'text-green-700'
                             : audioPlaying[item.id]
-                            ? 'text-green-600 animate-pulse'
+                            ? 'text-white animate-pulse'
                             : item.audioUrl
-                            ? 'text-blue-500'
+                            ? 'text-white'
                             : 'text-gray-500 dark:text-gray-400'}
                         />
                       </button>

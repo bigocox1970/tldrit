@@ -74,6 +74,17 @@ const SavedPage: React.FC = () => {
       setAudioLoading(prev => ({ ...prev, [summary.id]: true }));
       try {
         await generateAudioForSummary(summary.id);
+        // After generating, auto-play if audioUrl is now set
+        if (summary.audioUrl) {
+          if (!audioRefs.current[summary.id]) {
+            audioRefs.current[summary.id] = new Audio(summary.audioUrl);
+            audioRefs.current[summary.id]?.addEventListener('ended', () => {
+              setAudioPlaying(prev => ({ ...prev, [summary.id]: false }));
+            });
+          }
+          audioRefs.current[summary.id]?.play();
+          setAudioPlaying(prev => ({ ...prev, [summary.id]: true }));
+        }
       } finally {
         setAudioLoading(prev => ({ ...prev, [summary.id]: false }));
       }
