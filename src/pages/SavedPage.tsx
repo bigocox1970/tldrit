@@ -28,7 +28,6 @@ const SavedPage: React.FC = () => {
   const [exampleSummaries, setExampleSummaries] = useState<Summary[]>([]);
   const [exampleLoading, setExampleLoading] = useState(false);
   const audioRefs = React.useRef<{ [id: string]: HTMLAudioElement | null }>({});
-  const [ttsError, setTtsError] = useState<{ [id: string]: string }>({});
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -37,7 +36,7 @@ const SavedPage: React.FC = () => {
       // Fetch example summaries for unauthenticated users
       setExampleLoading(true);
       (async () => {
-        const { id: exampleUserId } = await getUserIdByEmail('example@tldrit.app');
+        const { id: exampleUserId } = await getUserIdByEmail('no-reply@tldrit.app');
         if (exampleUserId) {
           const { data } = await getSummaries(exampleUserId);
           setExampleSummaries(data || []);
@@ -85,7 +84,6 @@ const SavedPage: React.FC = () => {
 
   const handleSpeakerClick = async (summary: Summary, e: React.MouseEvent) => {
     e.stopPropagation();
-    setTtsError(prev => ({ ...prev, [summary.id]: '' }));
     
     // Stop any currently playing audio
     Object.entries(audioRefs.current).forEach(([id, audio]) => {
@@ -133,7 +131,6 @@ const SavedPage: React.FC = () => {
         let message = 'Failed to generate audio.';
         if (err instanceof Error) message = err.message;
         console.log('TTS error:', message);
-        setTtsError(prev => ({ ...prev, [summary.id]: message }));
       } finally {
         setAudioLoading(prev => ({ ...prev, [summary.id]: false }));
       }
@@ -144,6 +141,38 @@ const SavedPage: React.FC = () => {
     if (exampleLoading) {
       return <div>Loading example TLDRs...</div>;
     }
+
+    const handleExampleSpeakerClick = async (summary: Summary, e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!summary.audioUrl) return;
+      
+      // Stop any currently playing audio
+      Object.entries(audioRefs.current).forEach(([id, audio]) => {
+        if (audio && id !== summary.id) {
+          audio.pause();
+          audio.currentTime = 0;
+          setAudioPlaying(prev => ({ ...prev, [id]: false }));
+        }
+      });
+
+      // Initialize audio if not already done
+      if (!audioRefs.current[summary.id]) {
+        audioRefs.current[summary.id] = new Audio(summary.audioUrl);
+        audioRefs.current[summary.id]?.addEventListener('ended', () => {
+          setAudioPlaying(prev => ({ ...prev, [summary.id]: false }));
+        });
+      }
+
+      // Toggle play/pause
+      if (audioPlaying[summary.id]) {
+        audioRefs.current[summary.id]?.pause();
+        setAudioPlaying(prev => ({ ...prev, [summary.id]: false }));
+      } else {
+        audioRefs.current[summary.id]?.play();
+        setAudioPlaying(prev => ({ ...prev, [summary.id]: true }));
+      }
+    };
+
     return (
       <div>
         <div className="space-y-4">
@@ -168,11 +197,9 @@ const SavedPage: React.FC = () => {
                     {summary.isEli5 ? 'ELI5' : `Level ${summary.summaryLevel}`}
                   </span>
                   <button
-                    onClick={(e) => handleSpeakerClick(summary, e)}
+                    onClick={(e) => handleExampleSpeakerClick(summary, e)}
                     className={`ml-2 p-2 rounded-full transition-colors border border-gray-200 dark:border-gray-700
-                      ${audioLoading[summary.id] 
-                        ? 'animate-pulse bg-green-200' 
-                        : audioPlaying[summary.id]
+                      ${audioPlaying[summary.id]
                         ? 'bg-green-600'
                         : summary.audioUrl 
                         ? 'bg-green-500' 
@@ -180,22 +207,18 @@ const SavedPage: React.FC = () => {
                       }
                     `}
                     title={
-                      audioLoading[summary.id]
-                        ? 'Generating audio...'
-                        : audioPlaying[summary.id]
+                      audioPlaying[summary.id]
                         ? 'Pause audio'
                         : summary.audioUrl
                         ? 'Play audio'
-                        : 'Generate audio'
+                        : 'Audio not available'
                     }
-                    disabled={audioLoading[summary.id]}
+                    disabled={!summary.audioUrl}
                   >
                     <Volume2
                       size={20}
                       className={
-                        audioLoading[summary.id]
-                          ? 'text-green-700'
-                          : audioPlaying[summary.id]
+                        audioPlaying[summary.id]
                           ? 'text-white animate-pulse'
                           : summary.audioUrl
                           ? 'text-white'
@@ -203,11 +226,6 @@ const SavedPage: React.FC = () => {
                       }
                     />
                   </button>
-                  {ttsError[summary.id] && (
-                    <div className="mt-2 text-xs text-red-600 dark:text-red-400">
-                      {ttsError[summary.id]}
-                    </div>
-                  )}
                 </div>
               </CardContent>
             </Card>
