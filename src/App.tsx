@@ -14,6 +14,8 @@ import ListenPage from './pages/ListenPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ProfilePage from './pages/ProfilePage';
+import PricingPlans from './components/subscription/PricingPlans';
+import TermsPage from './pages/terms';
 
 // Define protected route component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -38,9 +40,9 @@ function App() {
   }, [checkAuthState]);
   
   return (
-    <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <Router>
       <Routes>
-        <Route path="/" element={<Layout />}>
+        <Route element={<Layout />}>
           <Route index element={<HomePage />} />
           <Route path="summarize" element={<SummarizePage />} />
           <Route path="news" element={<NewsPage />} />
@@ -53,6 +55,8 @@ function App() {
           } />
           <Route path="login" element={<LoginPage />} />
           <Route path="register" element={<RegisterPage />} />
+          <Route path="pricing" element={<PricingPlans />} />
+          <Route path="terms/*" element={<TermsPage />} />
         </Route>
       </Routes>
     </Router>

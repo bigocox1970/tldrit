@@ -17,6 +17,7 @@ const ProfilePage: React.FC = () => {
   const [success, setSuccess] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [eli5Age, setEli5Age] = useState(user?.eli5Age ?? 5);
+  const [plan, setPlan] = useState('');
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -24,7 +25,7 @@ const ProfilePage: React.FC = () => {
 
       const { data } = await supabase
         .from('profiles')
-        .select('username, full_name, eli5_age')
+        .select('username, full_name, eli5_age, plan')
         .eq('id', user.id)
         .single();
 
@@ -32,6 +33,7 @@ const ProfilePage: React.FC = () => {
         setUsername(data.username || '');
         setFullName(data.full_name || '');
         setEli5Age(data.eli5_age ?? 5);
+        setPlan(data.plan || 'free');
       }
     };
 
@@ -199,14 +201,14 @@ const ProfilePage: React.FC = () => {
         
         <CardContent>
           <p className="mb-4">
-            Current Plan: <span className="font-medium">{user?.isPremium ? 'Pro' : 'Free'}</span>
+            Current Plan: <span className="font-medium">{plan ? plan.charAt(0).toUpperCase() + plan.slice(1) : 'Free'}</span>
           </p>
           
           <Button
             variant="outline"
-            onClick={() => navigate('/profile/subscription')}
+            onClick={() => navigate('/pricing')}
           >
-            {user?.isPremium ? 'Manage Subscription' : 'Upgrade to Pro'}
+            {plan === 'pro' ? 'Manage Subscription' : 'Upgrade to Pro'}
           </Button>
         </CardContent>
       </Card>
