@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { Summary } from '../types';
+import { PostgrestError } from '@supabase/supabase-js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
@@ -207,8 +208,18 @@ export async function getNewsBySourceUrl(sourceUrl: string) {
   return { data, error };
 }
 
-// Upsert a news item by source_url
-export async function upsertNewsBySourceUrl(news: Record<string, any>) {
+interface NewsItem {
+  id: string;
+  title: string;
+  source_url: string;
+  url_hash: string;
+  summary?: string;
+  audio_url?: string;
+  category: string;
+  published_at: string;
+}
+
+export async function upsertNewsBySourceUrl(news: Omit<NewsItem, 'id'>) {
   const { data, error } = await supabase
     .from('news')
     .upsert([news], { onConflict: 'source_url' })
@@ -226,8 +237,7 @@ export async function getNewsByUrlHash(urlHash: string) {
   return { data: Array.isArray(data) && data.length > 0 ? data[0] : null, error };
 }
 
-// Upsert a news item by url_hash
-export async function upsertNewsByUrlHash(news: Record<string, any>) {
+export async function upsertNewsByUrlHash(news: Omit<NewsItem, 'id'>) {
   const { data, error } = await supabase
     .from('news')
     .upsert([news], { onConflict: 'url_hash' })
@@ -236,13 +246,16 @@ export async function upsertNewsByUrlHash(news: Record<string, any>) {
   return { data, error };
 }
 
-export async function getUserIdByEmail(email: string) {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('email', email)
-    .single();
-  return { id: data?.id, error };
+export async function getUserIdByEmail(email: string): Promise<{ id: string | null; error: Error | null }> {
+  try {
+    const { data: { users }, error } = await supabase.auth.admin.listUsers();
+    if (error) throw error;
+    
+    const user = users.find(u => u.email === email);
+    return { id: user?.id || null, error: null };
+  } catch (error) {
+    return { id: null, error: error as Error };
+  }
 }
 
 export async function deleteSummaries(summaryIds: string[]) {
@@ -253,4 +266,43 @@ export async function deleteSummaries(summaryIds: string[]) {
     .select();
   
   return { data, error };
+}
+
+export async function getExampleSummaries(): Promise<{ data: Summary[] | null; error: PostgrestError | null }> {
+  try {
+    // Get example user ID
+    const { data: exampleUserId, error: userError } = await supabase
+      .rpc('get_example_user_id');
+    
+    if (userError) throw userError;
+    if (!exampleUserId) {
+      return { data: null, error: null };
+    }
+
+    // Get summaries from example user
+    const { data, error } = await supabase
+      .from('summaries')
+      .select('*')
+      .eq('user_id', exampleUserId)
+      .order('created_at', { ascending: false });
+
+    if (error) return { data: null, error };
+
+    // Transform data from Supabase format to our app format
+    const summaries: Summary[] = data.map(item => ({
+      id: item.id,
+      userId: item.user_id,
+      title: item.title,
+      originalContent: item.original_content,
+      summary: item.summary,
+      createdAt: item.created_at,
+      audioUrl: item.audio_url,
+      isEli5: item.is_eli5,
+      summaryLevel: item.summary_level
+    }));
+
+    return { data: summaries, error: null };
+  } catch (error) {
+    return { data: null, error: error as PostgrestError };
+  }
 }

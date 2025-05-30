@@ -7,7 +7,7 @@ import Button from '../components/ui/Button';
 import ReactMarkdown from 'react-markdown';
 import { Volume2, Copy, Check, CheckSquare, Square } from 'lucide-react';
 import { Summary } from '../types';
-import { getUserIdByEmail, getSummaries } from '../lib/supabase';
+import { getExampleSummaries } from '../lib/supabase';
 
 const SavedPage: React.FC = () => {
   const navigate = useNavigate();
@@ -36,11 +36,8 @@ const SavedPage: React.FC = () => {
       // Fetch example summaries for unauthenticated users
       setExampleLoading(true);
       (async () => {
-        const { id: exampleUserId } = await getUserIdByEmail('no-reply@tldrit.app');
-        if (exampleUserId) {
-          const { data } = await getSummaries(exampleUserId);
-          setExampleSummaries(data || []);
-        }
+        const { data } = await getExampleSummaries();
+        setExampleSummaries(data || []);
         setExampleLoading(false);
       })();
     }

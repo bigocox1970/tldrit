@@ -4,18 +4,15 @@ import { useSummaryStore } from '../store/summaryStore';
 import { useAuthStore } from '../store/authStore';
 import Card, { CardContent } from '../components/ui/Card';
 import Button from '../components/ui/Button';
-import { getUserIdByEmail, getSummaries } from '../lib/supabase';
-import { Volume2 } from 'lucide-react';
+import { getExampleSummaries } from '../lib/supabase';
 import { Summary } from '../types';
 
 const ListenPage: React.FC = () => {
   const navigate = useNavigate();
   const { isAuthenticated, user } = useAuthStore();
   const { summaries, fetchSummaries, isLoading } = useSummaryStore();
-  const [audioPlaying, setAudioPlaying] = useState<{ [id: string]: boolean }>({});
   const [exampleSummaries, setExampleSummaries] = useState<Summary[]>([]);
   const [exampleLoading, setExampleLoading] = useState(false);
-  const audioRefs = React.useRef<{ [id: string]: HTMLAudioElement | null }>({});
   
   useEffect(() => {
     if (isAuthenticated) {
@@ -24,11 +21,9 @@ const ListenPage: React.FC = () => {
       // Fetch example summaries for unauthenticated users
       setExampleLoading(true);
       (async () => {
-        const { id: exampleUserId } = await getUserIdByEmail('no-reply@tldrit.app');
-        if (exampleUserId) {
-          const { data } = await getSummaries(exampleUserId);
-          setExampleSummaries(data || []);
-        }
+        const { data } = await getExampleSummaries();
+        // Filter to only show summaries with audio
+        setExampleSummaries((data || []).filter(s => s.audioUrl));
         setExampleLoading(false);
       })();
     }
@@ -42,37 +37,6 @@ const ListenPage: React.FC = () => {
       return <div>Loading example TLDRs...</div>;
     }
 
-    const handleExampleSpeakerClick = async (summary: Summary, e: React.MouseEvent) => {
-      e.stopPropagation();
-      if (!summary.audioUrl) return;
-      
-      // Stop any currently playing audio
-      Object.entries(audioRefs.current).forEach(([id, audio]) => {
-        if (audio && id !== summary.id) {
-          audio.pause();
-          audio.currentTime = 0;
-          setAudioPlaying(prev => ({ ...prev, [id]: false }));
-        }
-      });
-
-      // Initialize audio if not already done
-      if (!audioRefs.current[summary.id]) {
-        audioRefs.current[summary.id] = new Audio(summary.audioUrl);
-        audioRefs.current[summary.id]?.addEventListener('ended', () => {
-          setAudioPlaying(prev => ({ ...prev, [summary.id]: false }));
-        });
-      }
-
-      // Toggle play/pause
-      if (audioPlaying[summary.id]) {
-        audioRefs.current[summary.id]?.pause();
-        setAudioPlaying(prev => ({ ...prev, [summary.id]: false }));
-      } else {
-        audioRefs.current[summary.id]?.play();
-        setAudioPlaying(prev => ({ ...prev, [summary.id]: true }));
-      }
-    };
-
     return (
       <div>
         <div className="space-y-4">
@@ -82,49 +46,25 @@ const ListenPage: React.FC = () => {
               className="cursor-pointer hover:border-blue-300 border border-gray-200 dark:border-gray-700 transition-all"
             >
               <CardContent>
-                <h3 className="font-medium text-lg mb-2 line-clamp-1">
+                <h3 className="font-medium text-lg mb-4">
                   {summary.title}
                 </h3>
-                <p className="text-gray-600 dark:text-gray-400 line-clamp-2">
-                  {summary.summary}
-                </p>
-                <div className="flex justify-between items-center mt-4 text-sm text-gray-500 dark:text-gray-400">
+                
+                <audio 
+                  className="w-full mb-4" 
+                  controls 
+                  src={summary.audioUrl}
+                >
+                  Your browser does not support the audio element.
+                </audio>
+                
+                <div className="flex justify-between items-center text-sm text-gray-500 dark:text-gray-400">
                   <span>
                     {new Date(summary.createdAt).toLocaleDateString()}
                   </span>
                   <span>
                     {summary.isEli5 ? 'ELI5' : `Level ${summary.summaryLevel}`}
                   </span>
-                  <button
-                    onClick={(e) => handleExampleSpeakerClick(summary, e)}
-                    className={`ml-2 p-2 rounded-full transition-colors border border-gray-200 dark:border-gray-700
-                      ${audioPlaying[summary.id]
-                        ? 'bg-green-600'
-                        : summary.audioUrl 
-                        ? 'bg-green-500' 
-                        : 'bg-gray-200 dark:bg-gray-700'
-                      }
-                    `}
-                    title={
-                      audioPlaying[summary.id]
-                        ? 'Pause audio'
-                        : summary.audioUrl
-                        ? 'Play audio'
-                        : 'Audio not available'
-                    }
-                    disabled={!summary.audioUrl}
-                  >
-                    <Volume2
-                      size={20}
-                      className={
-                        audioPlaying[summary.id]
-                          ? 'text-white animate-pulse'
-                          : summary.audioUrl
-                          ? 'text-white'
-                          : 'text-gray-500 dark:text-gray-400'
-                      }
-                    />
-                  </button>
                 </div>
               </CardContent>
             </Card>
