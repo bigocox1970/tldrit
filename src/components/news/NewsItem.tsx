@@ -47,18 +47,30 @@ const NewsItem: React.FC<NewsItemProps> = ({ item, onTLDRClick }) => {
         audio.addEventListener('ended', () => {
           setCurrentlyPlaying(null);
         });
+        audio.addEventListener('error', () => {
+          console.error('Audio playback error');
+          setCurrentlyPlaying(null);
+        });
         useNewsStore.setState(state => ({
           audioRefs: { ...state.audioRefs, [item.id]: audio }
         }));
       }
 
+      const audio = audioRefs[item.id];
+      if (!audio) return;
+
       // Toggle play/pause
       if (currentlyPlayingId === item.id) {
-        audioRefs[item.id]?.pause();
+        audio.pause();
         setCurrentlyPlaying(null);
       } else {
-        audioRefs[item.id]?.play();
-        setCurrentlyPlaying(item.id);
+        try {
+          await audio.play();
+          setCurrentlyPlaying(item.id);
+        } catch (error) {
+          console.error('Failed to play audio:', error);
+          setCurrentlyPlaying(null);
+        }
       }
     } else {
       // Generate audio
@@ -66,16 +78,26 @@ const NewsItem: React.FC<NewsItemProps> = ({ item, onTLDRClick }) => {
       try {
         await generateAudioForNewsItem(item.id);
         // After generating, auto-play if audioUrl is now set
-        if (newsItem.audioUrl) {
-          const audio = new Audio(newsItem.audioUrl);
+        const updatedNewsItem = useNewsStore.getState().newsItems.find(i => i.id === item.id);
+        if (updatedNewsItem?.audioUrl) {
+          const audio = new Audio(updatedNewsItem.audioUrl);
           audio.addEventListener('ended', () => {
+            setCurrentlyPlaying(null);
+          });
+          audio.addEventListener('error', () => {
+            console.error('Audio playback error');
             setCurrentlyPlaying(null);
           });
           useNewsStore.setState(state => ({
             audioRefs: { ...state.audioRefs, [item.id]: audio }
           }));
-          audio.play();
-          setCurrentlyPlaying(item.id);
+          try {
+            await audio.play();
+            setCurrentlyPlaying(item.id);
+          } catch (error) {
+            console.error('Failed to play audio:', error);
+            setCurrentlyPlaying(null);
+          }
         }
       } finally {
         setAudioLoading(prev => ({ ...prev, [item.id]: false }));

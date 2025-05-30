@@ -227,3 +227,13 @@ export async function getUserIdByEmail(email: string) {
     .single();
   return { id: data?.id, error };
 }
+
+export async function deleteSummaries(summaryIds: string[]) {
+  const { data, error } = await supabase
+    .from('summaries')
+    .delete()
+    .in('id', summaryIds)
+    .select();
+  
+  return { data, error };
+}

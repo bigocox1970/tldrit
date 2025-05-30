@@ -21,7 +21,7 @@
 import { create } from 'zustand';
 import { Summary, SummaryRequest } from '../types';
 import { extractContentFromUrl, generateAudio, processFileContent, summarizeContent } from '../lib/ai';
-import { getSummaries, saveSummary } from '../lib/supabase';
+import { getSummaries, saveSummary, deleteSummaries } from '../lib/supabase';
 import { useAuthStore } from './authStore';
 
 interface SummaryState {
@@ -32,6 +32,11 @@ interface SummaryState {
   fetchSummaries: () => Promise<void>;
   createSummary: (request: SummaryRequest) => Promise<void>;
   generateAudioForSummary: (summaryId: string) => Promise<void>;
+  deleteSummaries: (summaryIds: string[]) => Promise<void>;
+  selectedSummaries: string[];
+  setSelectedSummaries: (summaryIds: string[]) => void;
+  isEditMode: boolean;
+  setEditMode: (isEdit: boolean) => void;
 }
 
 export const useSummaryStore = create<SummaryState>((set, get) => ({
@@ -39,6 +44,16 @@ export const useSummaryStore = create<SummaryState>((set, get) => ({
   currentSummary: null,
   isLoading: false,
   error: null,
+  selectedSummaries: [],
+  isEditMode: false,
+  
+  setSelectedSummaries: (summaryIds: string[]) => {
+    set({ selectedSummaries: summaryIds });
+  },
+
+  setEditMode: (isEdit: boolean) => {
+    set({ isEditMode: isEdit, selectedSummaries: isEdit ? [] : [] });
+  },
   
   fetchSummaries: async () => {
     const user = useAuthStore.getState().user;
@@ -213,6 +228,35 @@ export const useSummaryStore = create<SummaryState>((set, get) => ({
     } catch {
       set({ 
         error: 'Failed to generate audio', 
+        isLoading: false 
+      });
+    }
+  },
+
+  deleteSummaries: async (summaryIds: string[]) => {
+    const user = useAuthStore.getState().user;
+    if (!user) return;
+    
+    set({ isLoading: true, error: null });
+    try {
+      const { error } = await deleteSummaries(summaryIds);
+      
+      if (error) {
+        set({ error: error.message, isLoading: false });
+        return;
+      }
+      
+      // Remove deleted summaries from local state and reset edit mode
+      set(state => ({
+        summaries: state.summaries.filter(s => !summaryIds.includes(s.id)),
+        selectedSummaries: [],
+        isEditMode: false,
+        isLoading: false,
+        error: null
+      }));
+    } catch {
+      set({ 
+        error: 'Failed to delete summaries', 
         isLoading: false 
       });
     }

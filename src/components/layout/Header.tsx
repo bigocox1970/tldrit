@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Moon, Sun, User } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
+import { Moon, Sun, User, CheckSquare, Trash2 } from 'lucide-react';
+import { useSummaryStore } from '../../store/summaryStore';
 
 interface HeaderProps {
   isDarkMode: boolean;
@@ -11,6 +11,7 @@ interface HeaderProps {
 const Header: React.FC<HeaderProps> = ({ isDarkMode, toggleDarkMode }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { selectedSummaries, deleteSummaries, isEditMode, setEditMode } = useSummaryStore();
 
   const getPageTitle = () => {
     switch (location.pathname) {
@@ -33,6 +34,19 @@ const Header: React.FC<HeaderProps> = ({ isDarkMode, toggleDarkMode }) => {
       default:
         return 'TLDRit';
     }
+  };
+
+  const isSavedPage = location.pathname === '/saved';
+  const hasSelections = selectedSummaries.length > 0;
+
+  const handleDeleteClick = async () => {
+    if (window.confirm('Are you sure you want to delete the selected TLDRs?')) {
+      await deleteSummaries(selectedSummaries);
+    }
+  };
+
+  const handleSelectClick = () => {
+    setEditMode(!isEditMode);
   };
 
   return (
@@ -63,6 +77,26 @@ const Header: React.FC<HeaderProps> = ({ isDarkMode, toggleDarkMode }) => {
           {/* Search and actions */}
           <div className="hidden md:flex items-center space-x-4 z-10">
             <div className="flex items-center space-x-2">
+              {isSavedPage && !hasSelections && (
+                <button
+                  type="button"
+                  onClick={handleSelectClick}
+                  className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  title={isEditMode ? "Exit select mode" : "Enter select mode"}
+                >
+                  <CheckSquare size={20} />
+                </button>
+              )}
+              {hasSelections && (
+                <button
+                  type="button"
+                  onClick={handleDeleteClick}
+                  className="p-2 rounded-full text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/20"
+                  title="Delete selected"
+                >
+                  <Trash2 size={20} />
+                </button>
+              )}
               <button
                 type="button"
                 onClick={toggleDarkMode}
@@ -82,6 +116,26 @@ const Header: React.FC<HeaderProps> = ({ isDarkMode, toggleDarkMode }) => {
 
           {/* Mobile actions */}
           <div className="md:hidden flex items-center space-x-2 z-10">
+            {isSavedPage && !hasSelections && (
+              <button
+                type="button"
+                onClick={handleSelectClick}
+                className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                title={isEditMode ? "Exit select mode" : "Enter select mode"}
+              >
+                <CheckSquare size={20} />
+              </button>
+            )}
+            {hasSelections && (
+              <button
+                type="button"
+                onClick={handleDeleteClick}
+                className="p-2 rounded-full text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/20"
+                title="Delete selected"
+              >
+                <Trash2 size={20} />
+              </button>
+            )}
             <button
               type="button"
               onClick={toggleDarkMode}
