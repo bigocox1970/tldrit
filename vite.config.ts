@@ -59,7 +59,32 @@ export default defineConfig(({ mode }) => {
               type: 'image/png',
               purpose: 'any maskable'
             }
-          ]
+          ],
+          start_url: '/',
+          display: 'standalone',
+          background_color: '#ffffff'
+        },
+        workbox: {
+          globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+          runtimeCaching: [
+            {
+              urlPattern: /^https:\/\/tldrit\.app\/.*/i,
+              handler: 'NetworkFirst',
+              options: {
+                cacheName: 'tldrit-dynamic',
+                networkTimeoutSeconds: 10,
+                expiration: {
+                  maxEntries: 50,
+                  maxAgeSeconds: 24 * 60 * 60 // 24 hours
+                },
+                cacheableResponse: {
+                  statuses: [0, 200]
+                }
+              }
+            }
+          ],
+          navigateFallback: '/index.html',
+          navigateFallbackDenylist: [/^\/api\//]
         }
       })
     ],
