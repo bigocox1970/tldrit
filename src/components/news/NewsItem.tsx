@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Volume2, Bookmark, BookmarkCheck, FileText, Copy, Headphones, ChevronDown } from 'lucide-react';
 import { NewsItem as NewsItemType } from '../../types';
 import Card, { CardContent } from '../ui/Card';
@@ -12,7 +12,7 @@ interface NewsItemProps {
 }
 
 const NewsItem: React.FC<NewsItemProps> = ({ item, onTLDRClick }) => {
-  const { generateAudioForNewsItem, tldrLoading } = useNewsStore();
+  const { generateAudioForNewsItem, tldrLoading, currentlyPlayingId, setCurrentlyPlaying, audioRefs } = useNewsStore();
   const { user } = useAuthStore();
   const localStorageKey = `tldr-open-${item.id}`;
   const [showTLDR, setShowTLDR] = useState(() => {
@@ -27,9 +27,7 @@ const NewsItem: React.FC<NewsItemProps> = ({ item, onTLDRClick }) => {
     }
   }, [showTLDR, localStorageKey]);
   const [copied, setCopied] = useState(false);
-  const audioRefs = useRef<{ [id: string]: HTMLAudioElement | null }>({});
   const [audioLoading, setAudioLoading] = useState<{ [id: string]: boolean }>({});
-  const [audioPlaying, setAudioPlaying] = useState<{ [id: string]: boolean }>({});
   
   const handleClick = () => {
     window.open(item.sourceUrl, '_blank');
@@ -41,30 +39,26 @@ const NewsItem: React.FC<NewsItemProps> = ({ item, onTLDRClick }) => {
 
   const handleSpeakerClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    // Stop any currently playing audio
-    Object.entries(audioRefs.current).forEach(([id, audio]) => {
-      if (audio && id !== item.id) {
-        audio.pause();
-        audio.currentTime = 0;
-        setAudioPlaying(prev => ({ ...prev, [id]: false }));
-      }
-    });
 
     if (newsItem.audioUrl) {
       // Initialize audio if not already done
-      if (!audioRefs.current[item.id]) {
-        audioRefs.current[item.id] = new Audio(newsItem.audioUrl);
-        audioRefs.current[item.id]?.addEventListener('ended', () => {
-          setAudioPlaying(prev => ({ ...prev, [item.id]: false }));
+      if (!audioRefs[item.id]) {
+        const audio = new Audio(newsItem.audioUrl);
+        audio.addEventListener('ended', () => {
+          setCurrentlyPlaying(null);
         });
+        useNewsStore.setState(state => ({
+          audioRefs: { ...state.audioRefs, [item.id]: audio }
+        }));
       }
+
       // Toggle play/pause
-      if (audioPlaying[item.id]) {
-        audioRefs.current[item.id]?.pause();
-        setAudioPlaying(prev => ({ ...prev, [item.id]: false }));
+      if (currentlyPlayingId === item.id) {
+        audioRefs[item.id]?.pause();
+        setCurrentlyPlaying(null);
       } else {
-        audioRefs.current[item.id]?.play();
-        setAudioPlaying(prev => ({ ...prev, [item.id]: true }));
+        audioRefs[item.id]?.play();
+        setCurrentlyPlaying(item.id);
       }
     } else {
       // Generate audio
@@ -73,14 +67,15 @@ const NewsItem: React.FC<NewsItemProps> = ({ item, onTLDRClick }) => {
         await generateAudioForNewsItem(item.id);
         // After generating, auto-play if audioUrl is now set
         if (newsItem.audioUrl) {
-          if (!audioRefs.current[item.id]) {
-            audioRefs.current[item.id] = new Audio(newsItem.audioUrl);
-            audioRefs.current[item.id]?.addEventListener('ended', () => {
-              setAudioPlaying(prev => ({ ...prev, [item.id]: false }));
-            });
-          }
-          audioRefs.current[item.id]?.play();
-          setAudioPlaying(prev => ({ ...prev, [item.id]: true }));
+          const audio = new Audio(newsItem.audioUrl);
+          audio.addEventListener('ended', () => {
+            setCurrentlyPlaying(null);
+          });
+          useNewsStore.setState(state => ({
+            audioRefs: { ...state.audioRefs, [item.id]: audio }
+          }));
+          audio.play();
+          setCurrentlyPlaying(item.id);
         }
       } finally {
         setAudioLoading(prev => ({ ...prev, [item.id]: false }));
@@ -96,6 +91,21 @@ const NewsItem: React.FC<NewsItemProps> = ({ item, onTLDRClick }) => {
       useNewsStore.getState().generateTLDRForNewsItem(item.id);
     }
   }, [showTLDR, newsItem.tldr, user, tldrLoading[item.id], item.id]);
+
+  useEffect(() => {
+    return () => {
+      // Cleanup audio on unmount
+      if (audioRefs[item.id]) {
+        audioRefs[item.id]?.pause();
+        audioRefs[item.id]?.remove();
+        useNewsStore.setState(state => {
+          const newRefs = { ...state.audioRefs };
+          delete newRefs[item.id];
+          return { audioRefs: newRefs };
+        });
+      }
+    };
+  }, [item.id, audioRefs]);
 
   return (
     <Card className="cursor-pointer hover:shadow-md transition-shadow">
@@ -166,7 +176,7 @@ const NewsItem: React.FC<NewsItemProps> = ({ item, onTLDRClick }) => {
                         className={`ml-2 p-2 rounded-full border border-gray-200 dark:border-gray-700 transition-colors
                           ${audioLoading[item.id]
                             ? 'animate-pulse bg-green-200'
-                            : audioPlaying[item.id]
+                            : currentlyPlayingId === item.id
                             ? 'bg-green-600'
                             : newsItem.audioUrl
                             ? 'bg-green-500'
@@ -174,7 +184,7 @@ const NewsItem: React.FC<NewsItemProps> = ({ item, onTLDRClick }) => {
                         `}
                         title={audioLoading[item.id]
                           ? 'Generating audio...'
-                          : audioPlaying[item.id]
+                          : currentlyPlayingId === item.id
                           ? 'Pause audio'
                           : newsItem.audioUrl
                           ? 'Play audio'
@@ -184,7 +194,7 @@ const NewsItem: React.FC<NewsItemProps> = ({ item, onTLDRClick }) => {
                           size={20}
                           className={audioLoading[item.id]
                             ? 'text-green-700'
-                            : audioPlaying[item.id]
+                            : currentlyPlayingId === item.id
                             ? 'text-white animate-pulse'
                             : newsItem.audioUrl
                             ? 'text-white'

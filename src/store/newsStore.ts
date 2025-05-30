@@ -19,6 +19,10 @@ interface NewsState {
   error: string | null;
   isFetching: boolean;
   tldrLoading: { [newsItemId: string]: boolean };
+  currentlyPlayingId: string | null;
+  audioRefs: { [id: string]: HTMLAudioElement | null };
+  setCurrentlyPlaying: (newsItemId: string | null) => void;
+  stopAllAudio: () => void;
   fetchNewsItems: () => Promise<void>;
   fetchAvailableInterests: () => Promise<void>;
   updateUserInterests: (interests: string[]) => Promise<void>;
@@ -37,6 +41,32 @@ export const useNewsStore = create<NewsState>((set, get) => ({
   error: null,
   isFetching: false,
   tldrLoading: {},
+  currentlyPlayingId: null,
+  audioRefs: {},
+  
+  setCurrentlyPlaying: (newsItemId: string | null) => {
+    const state = get();
+    // Stop currently playing audio if any
+    if (state.currentlyPlayingId && state.currentlyPlayingId !== newsItemId) {
+      const audio = state.audioRefs[state.currentlyPlayingId];
+      if (audio) {
+        audio.pause();
+        audio.currentTime = 0;
+      }
+    }
+    set({ currentlyPlayingId: newsItemId });
+  },
+
+  stopAllAudio: () => {
+    const state = get();
+    Object.values(state.audioRefs).forEach(audio => {
+      if (audio) {
+        audio.pause();
+        audio.currentTime = 0;
+      }
+    });
+    set({ currentlyPlayingId: null });
+  },
   
   fetchNewsItems: async () => {
     const state = get();
