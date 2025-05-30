@@ -108,6 +108,23 @@ export async function saveSummary(summary: Omit<Summary, 'id' | 'createdAt'>) {
   return { data, error };
 }
 
+export async function updateSummary(id: string, summary: Partial<Omit<Summary, 'id' | 'createdAt'>>) {
+  const { data, error } = await supabase
+    .from('summaries')
+    .update({
+      title: summary.title,
+      original_content: summary.originalContent,
+      summary: summary.summary,
+      is_eli5: summary.isEli5,
+      summary_level: summary.summaryLevel,
+      audio_url: summary.audioUrl,
+    })
+    .eq('id', id)
+    .select();
+  
+  return { data, error };
+}
+
 export async function getNewsItems(userId: string) {
   // First get user interests
   const { data: profile } = await supabase

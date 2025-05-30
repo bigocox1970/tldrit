@@ -21,7 +21,7 @@
 import { create } from 'zustand';
 import { Summary, SummaryRequest } from '../types';
 import { extractContentFromUrl, generateAudio, processFileContent, summarizeContent } from '../lib/ai';
-import { getSummaries, saveSummary, deleteSummaries } from '../lib/supabase';
+import { getSummaries, saveSummary, deleteSummaries, updateSummary } from '../lib/supabase';
 import { useAuthStore } from './authStore';
 
 interface SummaryState {
@@ -203,15 +203,9 @@ export const useSummaryStore = create<SummaryState>((set, get) => ({
       // Update the summary with the new audio URL
       const updatedSummary = { ...summary, audioUrl };
       
-      // Update in database
-      await saveSummary({
-        userId: updatedSummary.userId,
-        title: updatedSummary.title,
-        originalContent: updatedSummary.originalContent,
-        summary: updatedSummary.summary,
-        isEli5: updatedSummary.isEli5,
-        summaryLevel: updatedSummary.summaryLevel,
-        audioUrl: updatedSummary.audioUrl,
+      // Update in database using updateSummary instead of saveSummary
+      await updateSummary(summaryId, {
+        audioUrl: updatedSummary.audioUrl
       });
       
       // Update in local state
