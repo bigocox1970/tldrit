@@ -104,6 +104,7 @@ const SavedPage: React.FC = () => {
       } catch (err: unknown) {
         let message = 'Failed to generate audio.';
         if (err instanceof Error) message = err.message;
+        console.log('TTS error:', message);
         setTtsError(prev => ({ ...prev, [summary.id]: message }));
       } finally {
         setAudioLoading(prev => ({ ...prev, [summary.id]: false }));
