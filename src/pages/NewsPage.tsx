@@ -1,11 +1,19 @@
-import React from 'react';
+import React, { useState } from 'react';
 import InterestSelector from '../components/news/InterestSelector';
 import NewsFeed from '../components/news/NewsFeed';
 import { useAuthStore } from '../store/authStore';
 
 const NewsPage: React.FC = () => {
   const { isAuthenticated } = useAuthStore();
-  
+  const [showTLDRPopup, setShowTLDRPopup] = useState(false);
+
+  // Handler to be passed to NewsFeed/NewsItem
+  const handleTLDRClick = () => {
+    if (!isAuthenticated) {
+      setShowTLDRPopup(true);
+    }
+  };
+
   return (
     <div>
       {/* <h1 className="text-2xl font-bold mb-6">News Feed</h1> */}
@@ -19,7 +27,15 @@ const NewsPage: React.FC = () => {
       
       {isAuthenticated && <InterestSelector />}
       
-      <NewsFeed />
+      <NewsFeed onTLDRClick={handleTLDRClick} />
+      {showTLDRPopup && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-40">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 max-w-sm w-full text-center">
+            <p className="text-lg font-semibold mb-4">Sign in or create a FREE account to use the TLDR feature.</p>
+            <button className="mt-2 px-4 py-2 bg-blue-600 text-white rounded" onClick={() => setShowTLDRPopup(false)}>Close</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

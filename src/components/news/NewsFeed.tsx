@@ -2,7 +2,11 @@ import React, { useEffect, useCallback } from 'react';
 import { useNewsStore } from '../../store/newsStore';
 import NewsItem from './NewsItem';
 
-const NewsFeed: React.FC = () => {
+interface NewsFeedProps {
+  onTLDRClick?: () => void;
+}
+
+const NewsFeed: React.FC<NewsFeedProps> = ({ onTLDRClick }) => {
   const { newsItems, fetchNewsItems, isLoading } = useNewsStore();
   
   // Memoize the fetch function to prevent unnecessary re-renders
@@ -36,7 +40,7 @@ const NewsFeed: React.FC = () => {
     <div>
       <div className="space-y-6">
         {newsItems.map(item => (
-          <NewsItem key={item.id} item={item} />
+          <NewsItem key={item.id} item={item} onTLDRClick={onTLDRClick} />
         ))}
       </div>
     </div>

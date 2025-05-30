@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FileText } from 'lucide-react';
 import Button from '../ui/Button';
-import { useAuthStore } from '../../store/authStore';
 
 const dynamicTexts = [
   'meeting minutes',
@@ -17,7 +16,6 @@ const dynamicTexts = [
 const HERO_SPECIAL = 'Oh, and ANY webpage!';
 
 const HeroSection: React.FC = () => {
-  const { isAuthenticated } = useAuthStore();
   const [currentTextIndex, setCurrentTextIndex] = useState(0);
   // Animation state for the special step
   const [ohStep, setOhStep] = useState(0); // 0: Oh, 1: dots, 2: reveal rest
@@ -111,16 +109,9 @@ const HeroSection: React.FC = () => {
       <div className="w-full max-w-sm mx-auto flex flex-col gap-4">
         <Link to="/summarize" className="w-full">
           <Button variant="primary" size="lg" className="w-full py-3 text-2xl rounded-md">
-            Get Started
+            Try it now, its FREE!
           </Button>
         </Link>
-        {!isAuthenticated && (
-          <Link to="/register" className="w-full">
-            <Button variant="outline" size="lg" className="w-full py-3 text-2xl rounded-md">
-              Create Account
-            </Button>
-          </Link>
-        )}
       </div>
     </div>
   );

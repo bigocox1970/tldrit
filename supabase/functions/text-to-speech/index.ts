@@ -48,9 +48,9 @@ serve(async (req: Request) => {
 
     const { text, isPremium } = await req.json() as TTSRequest;
 
-    if (!isPremium && text.length > 300) {
+    if (!isPremium && text.length > 700) {
       return new Response(
-        JSON.stringify({ error: "Free users are limited to 300 characters for text-to-speech" }),
+        JSON.stringify({ error: "Audio is only available for summaries up to 700 characters on the free plan. Upgrade to Pro for longer audio." }),
         {
           status: 403,
           headers: { ...corsHeaders, "Content-Type": "application/json" },

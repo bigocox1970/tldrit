@@ -44,16 +44,8 @@ function App() {
           <Route index element={<HomePage />} />
           <Route path="summarize" element={<SummarizePage />} />
           <Route path="news" element={<NewsPage />} />
-          <Route path="saved" element={
-            <ProtectedRoute>
-              <SavedPage />
-            </ProtectedRoute>
-          } />
-          <Route path="listen" element={
-            <ProtectedRoute>
-              <ListenPage />
-            </ProtectedRoute>
-          } />
+          <Route path="saved" element={<SavedPage />} />
+          <Route path="listen" element={<ListenPage />} />
           <Route path="profile" element={
             <ProtectedRoute>
               <ProfilePage />

@@ -8,9 +8,10 @@ import { useAuthStore } from '../../store/authStore';
 
 interface NewsItemProps {
   item: NewsItemType;
+  onTLDRClick?: () => void;
 }
 
-const NewsItem: React.FC<NewsItemProps> = ({ item }) => {
+const NewsItem: React.FC<NewsItemProps> = ({ item, onTLDRClick }) => {
   const { generateAudioForNewsItem, tldrLoading } = useNewsStore();
   const { user } = useAuthStore();
   const localStorageKey = `tldr-open-${item.id}`;
@@ -252,6 +253,10 @@ const NewsItem: React.FC<NewsItemProps> = ({ item }) => {
               <button
                 onClick={(e) => {
                   e.stopPropagation();
+                  if (!user) {
+                    if (onTLDRClick) onTLDRClick();
+                    return;
+                  }
                   if (!showTLDR) setShowTLDR(true);
                   if (!tldrText && user && !tldrLoading[item.id]) {
                     useNewsStore.getState().generateTLDRForNewsItem(item.id);
@@ -259,7 +264,7 @@ const NewsItem: React.FC<NewsItemProps> = ({ item }) => {
                 }}
                 disabled={tldrLoading[item.id] || !user}
                 className={`flex items-center space-x-1 px-3 py-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${tldrLoading[item.id] || !user ? 'opacity-50 cursor-not-allowed' : ''}`}
-                title={!user ? "Login required for TLDR" : tldrText ? "Toggle TLDR" : "Generate TLDR"}
+                title={!user ? "Sign in or create a FREE account to use the TLDR feature" : tldrText ? "Toggle TLDR" : "Generate TLDR"}
               >
                 {tldrLoading[item.id] ? (
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>

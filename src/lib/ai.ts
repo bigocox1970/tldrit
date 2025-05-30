@@ -176,7 +176,12 @@ export async function generateAudio(text: string, isPremium: boolean) {
 
     return response.data.audioUrl;
   } catch (error) {
-    console.error('Error generating audio:', error);
+    const err = error as any;
+    console.error('Error generating audio:', err);
+    // If error is a 403 from backend, extract and throw the message
+    if (err.response && err.response.status === 403) {
+      throw new Error(err.response.data?.error || 'Audio is only available for summaries up to 700 characters on the free plan. Upgrade to Pro for longer audio.');
+    }
     throw new Error('Failed to generate audio');
   }
 }

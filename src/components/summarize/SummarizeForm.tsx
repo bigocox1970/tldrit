@@ -69,8 +69,8 @@ const SummarizeForm: React.FC = () => {
       
       if (!user?.isPremium) {
         const wordCount = content.split(/\s+/).length;
-        if (wordCount > 500) {
-          setError('Free accounts are limited to 500 words. Upgrade to summarize longer content.');
+        if (wordCount > 1000) {
+          setError('Free accounts are limited to 1000 words. Upgrade to summarize longer content.');
           return;
         }
       }
@@ -240,9 +240,9 @@ const SummarizeForm: React.FC = () => {
                 </Link>{' '}
                 or{' '}
                 <Link to="/register" className="font-medium hover:underline">
-                  create an account
+                  create a FREE account
                 </Link>{' '}
-                to save your summaries and access premium features.
+                to use the TLDR feature.
               </p>
             </div>
           )}

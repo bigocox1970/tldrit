@@ -218,3 +218,12 @@ export async function upsertNewsByUrlHash(news: Record<string, any>) {
     .single();
   return { data, error };
 }
+
+export async function getUserIdByEmail(email: string) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('email', email)
+    .single();
+  return { id: data?.id, error };
+}
