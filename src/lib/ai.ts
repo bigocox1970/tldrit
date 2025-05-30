@@ -155,7 +155,7 @@ ${markdownInstructions}`
   }
 }
 
-export async function generateAudio(text: string, isPremium: boolean) {
+export async function generateAudio(text: string, isPremium: boolean, type?: 'news' | 'user') {
   // Get the current user's session and access token
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
@@ -167,6 +167,7 @@ export async function generateAudio(text: string, isPremium: boolean) {
     const response = await axios.post('/api/text-to-speech', {
       text,
       isPremium,
+      type,
     }, {
       headers: {
         'Authorization': `Bearer ${token}`,

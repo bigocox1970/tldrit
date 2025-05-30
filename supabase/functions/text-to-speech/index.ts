@@ -10,6 +10,7 @@ const corsHeaders = {
 interface TTSRequest {
   text: string;
   isPremium: boolean;
+  type?: 'news' | 'user';
 }
 
 serve(async (req: Request) => {
@@ -46,11 +47,11 @@ serve(async (req: Request) => {
       );
     }
 
-    const { text, isPremium } = await req.json() as TTSRequest;
+    const { text, isPremium, type } = await req.json() as TTSRequest;
 
-    if (!isPremium && text.length > 700) {
+    if (type !== 'news' && !isPremium) {
       return new Response(
-        JSON.stringify({ error: "Audio is only available for summaries up to 700 characters on the free plan. Upgrade to Pro for longer audio." }),
+        JSON.stringify({ error: "Audio generation is a Pro feature. Please upgrade to generate or listen to audio." }),
         {
           status: 403,
           headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -71,7 +71,7 @@ export const useSummaryStore = create<SummaryState>((set, get) => ({
         isLoading: false, 
         error: null 
       });
-    } catch (err) {
+    } catch {
       set({ 
         error: 'Failed to fetch summaries', 
         isLoading: false 
@@ -82,6 +82,22 @@ export const useSummaryStore = create<SummaryState>((set, get) => ({
   createSummary: async (request: SummaryRequest) => {
     const user = useAuthStore.getState().user;
     if (!user) return;
+    
+    // Enforce 10 TLDRs per month for free users
+    if (!user.isPremium) {
+      // Count summaries created this month
+      const now = new Date();
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+      const summariesThisMonth = get().summaries.filter(s => {
+        const created = new Date(s.createdAt);
+        return created.getMonth() === currentMonth && created.getFullYear() === currentYear;
+      });
+      if (summariesThisMonth.length >= 10) {
+        set({ error: 'Free accounts are limited to 10 TLDRs per month. Upgrade to Pro for unlimited summaries.' });
+        return;
+      }
+    }
     
     set({ isLoading: true, error: null });
     try {
@@ -150,7 +166,7 @@ export const useSummaryStore = create<SummaryState>((set, get) => ({
         isLoading: false, 
         error: null 
       }));
-    } catch (err) {
+    } catch {
       set({ 
         error: 'Failed to create summary', 
         isLoading: false 
@@ -194,7 +210,7 @@ export const useSummaryStore = create<SummaryState>((set, get) => ({
         isLoading: false,
         error: null,
       }));
-    } catch (err) {
+    } catch {
       set({ 
         error: 'Failed to generate audio', 
         isLoading: false 

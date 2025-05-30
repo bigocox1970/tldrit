@@ -212,7 +212,7 @@ export const useNewsStore = create<NewsState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const audioText = newsItem.tldr || newsItem.summary;
-      const audioUrl = await generateAudio(audioText, user.isPremium);
+      const audioUrl = await generateAudio(audioText, user.isPremium, 'news');
       // Minimal required fields for audio upsert (debugging 400 error)
       const audioUpsertPayload = {
         url_hash: urlHash,
