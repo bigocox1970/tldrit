@@ -119,8 +119,20 @@ export async function updateSummary(id: string, summary: Partial<Omit<Summary, '
       is_eli5: summary.isEli5,
       summary_level: summary.summaryLevel,
       audio_url: summary.audioUrl,
+      in_playlist: summary.inPlaylist,
     })
     .eq('id', id)
+    .select();
+  
+  return { data, error };
+}
+
+// Update summary playlist status
+export async function updateSummaryPlaylist(summaryId: string, inPlaylist: boolean) {
+  const { data, error } = await supabase
+    .from('summaries')
+    .update({ in_playlist: inPlaylist })
+    .eq('id', summaryId)
     .select();
   
   return { data, error };
@@ -164,10 +176,38 @@ export async function getUserNewsMeta(userId: string) {
   return { data, error };
 }
 
-export async function upsertUserNewsMeta(userId: string, newsId: string, meta: { bookmarked?: boolean; inPlaylist?: boolean }) {
+export async function upsertUserNewsMeta(userId: string, newsId: string, meta: { bookmarked?: boolean; in_playlist?: boolean }) {
   const { data, error } = await supabase
     .from('user_news_meta')
     .upsert({ user_id: userId, news_id: newsId, ...meta }, { onConflict: 'user_id,news_id' });
+  return { data, error };
+}
+
+// Get bookmarked news items for a user
+export async function getBookmarkedNewsItems(userId: string) {
+  const { data, error } = await supabase
+    .from('user_news_meta')
+    .select(`
+      news_id,
+      bookmarked,
+      in_playlist,
+      news (
+        id,
+        title,
+        source_url,
+        url_hash,
+        summary,
+        tldr,
+        audio_url,
+        category,
+        published_at,
+        image_url
+      )
+    `)
+    .eq('user_id', userId)
+    .eq('bookmarked', true)
+    .order('created_at', { ascending: false });
+  
   return { data, error };
 }
 
@@ -305,4 +345,32 @@ export async function getExampleSummaries(): Promise<{ data: Summary[] | null; e
   } catch (error) {
     return { data: null, error: error as PostgrestError };
   }
+}
+
+// Get playlist news items for a user (news items with inPlaylist: true)
+export async function getPlaylistNewsItems(userId: string) {
+  const { data, error } = await supabase
+    .from('user_news_meta')
+    .select(`
+      news_id,
+      bookmarked,
+      in_playlist,
+      news (
+        id,
+        title,
+        source_url,
+        url_hash,
+        summary,
+        tldr,
+        audio_url,
+        category,
+        published_at,
+        image_url
+      )
+    `)
+    .eq('user_id', userId)
+    .eq('in_playlist', true)
+    .order('created_at', { ascending: false });
+  
+  return { data, error };
 }

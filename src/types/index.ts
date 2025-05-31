@@ -17,6 +17,7 @@ export interface Summary {
   isEli5: boolean;
   summaryLevel: number; // 1-5, where 1 is shortest, 5 is most detailed
   eli5Level?: number;
+  inPlaylist?: boolean;
 }
 
 export interface NewsItem {
@@ -31,6 +32,7 @@ export interface NewsItem {
   audioUrl?: string;
   inPlaylist?: boolean;
   bookmarked?: boolean;
+  dbId?: string; // Database UUID for bookmark operations (when news item exists in DB)
 }
 
 export interface SummaryRequest {

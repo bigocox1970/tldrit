@@ -14,7 +14,7 @@ interface TLDROptions {
 interface UserNewsMeta {
   news_id: string;
   bookmarked: boolean;
-  inPlaylist: boolean;
+  in_playlist: boolean;
 }
 
 interface NewsState {
@@ -27,6 +27,18 @@ interface NewsState {
   tldrLoading: { [newsItemId: string]: boolean };
   currentlyPlayingId: string | null;
   audioRefs: { [id: string]: HTMLAudioElement | null };
+  // Listen page specific selection state
+  selectedListenNewsItems: string[];
+  setSelectedListenNewsItems: (itemIds: string[]) => void;
+  isListenNewsEditMode: boolean;
+  setListenNewsEditMode: (isEdit: boolean) => void;
+  removeNewsFromPlaylist: (itemIds: string[]) => Promise<void>;
+  // Saved page specific selection state
+  selectedSavedNewsItems: string[];
+  setSelectedSavedNewsItems: (itemIds: string[]) => void;
+  isSavedNewsEditMode: boolean;
+  setSavedNewsEditMode: (isEdit: boolean) => void;
+  deleteSelectedNewsItems: (itemIds: string[]) => Promise<void>;
   setCurrentlyPlaying: (newsItemId: string | null) => void;
   stopAllAudio: () => void;
   fetchNewsItems: () => Promise<void>;
@@ -49,7 +61,71 @@ export const useNewsStore = create<NewsState>((set, get) => ({
   tldrLoading: {},
   currentlyPlayingId: null,
   audioRefs: {},
-  
+  selectedListenNewsItems: [],
+  setSelectedListenNewsItems: (itemIds: string[]) => {
+    set({ selectedListenNewsItems: itemIds });
+  },
+  isListenNewsEditMode: false,
+  setListenNewsEditMode: (isEdit: boolean) => {
+    set({ isListenNewsEditMode: isEdit });
+  },
+  // Saved page specific state
+  selectedSavedNewsItems: [],
+  setSelectedSavedNewsItems: (itemIds: string[]) => {
+    set({ selectedSavedNewsItems: itemIds });
+  },
+  isSavedNewsEditMode: false,
+  setSavedNewsEditMode: (isEdit: boolean) => {
+    set({ isSavedNewsEditMode: isEdit, selectedSavedNewsItems: isEdit ? [] : [] });
+  },
+  deleteSelectedNewsItems: async (itemIds: string[]) => {
+    const user = useAuthStore.getState().user;
+    if (!user) return;
+    
+    set({ isLoading: true, error: null });
+    try {
+      // For saved page, we want to remove bookmarks (which will remove them from saved page)
+      await Promise.all(itemIds.map(id => 
+        get().toggleBookmark(id)
+      ));
+      
+      // Clear selection and exit edit mode
+      set({ 
+        selectedSavedNewsItems: [], 
+        isSavedNewsEditMode: false,
+        isLoading: false 
+      });
+    } catch {
+      set({ 
+        error: 'Failed to delete news items', 
+        isLoading: false 
+      });
+    }
+  },
+  removeNewsFromPlaylist: async (itemIds: string[]) => {
+    const user = useAuthStore.getState().user;
+    if (!user) return;
+    
+    set({ isLoading: true, error: null });
+    try {
+      // Remove items from playlist by toggling their playlist status
+      await Promise.all(itemIds.map(id => 
+        get().togglePlaylist(id)
+      ));
+      
+      // Clear selection and exit edit mode
+      set({ 
+        selectedListenNewsItems: [], 
+        isListenNewsEditMode: false,
+        isLoading: false 
+      });
+    } catch {
+      set({ 
+        error: 'Failed to remove news items from playlist', 
+        isLoading: false 
+      });
+    }
+  },
   setCurrentlyPlaying: (newsItemId: string | null) => {
     const state = get();
     // Stop currently playing audio if any
@@ -62,7 +138,6 @@ export const useNewsStore = create<NewsState>((set, get) => ({
     }
     set({ currentlyPlayingId: newsItemId });
   },
-
   stopAllAudio: () => {
     const state = get();
     Object.values(state.audioRefs).forEach(audio => {
@@ -130,12 +205,19 @@ export const useNewsStore = create<NewsState>((set, get) => ({
         newsItems = await fetchNewsForCategories(categories);
       }
 
-      // Fetch stored news items to get audio URLs
+      // Fetch stored news items to get audio URLs and database IDs
       const storedNewsPromises = newsItems.map(async (item) => {
         const urlHash = urlToHash(item.sourceUrl);
         const { data: storedNews } = await getNewsByUrlHash(urlHash);
-        if (storedNews?.audio_url) {
-          item.audioUrl = storedNews.audio_url;
+        if (storedNews) {
+          // Store the database ID for bookmark operations
+          item.dbId = storedNews.id;
+          if (storedNews.audio_url) {
+            item.audioUrl = storedNews.audio_url;
+          }
+          if (storedNews.tldr) {
+            item.tldr = storedNews.tldr;
+          }
         }
         return item;
       });
@@ -156,8 +238,12 @@ export const useNewsStore = create<NewsState>((set, get) => ({
         if (meta) {
           set(state => ({
             newsItems: state.newsItems.map(item => {
-              const metaItem = meta.find((m: UserNewsMeta) => m.news_id === item.id);
-              return metaItem ? { ...item, bookmarked: metaItem.bookmarked, inPlaylist: metaItem.inPlaylist } : item;
+              // Only check for meta if item has a database ID
+              if (item.dbId) {
+                const metaItem = meta.find((m: UserNewsMeta) => m.news_id === item.dbId);
+                return metaItem ? { ...item, bookmarked: metaItem.bookmarked, inPlaylist: metaItem.in_playlist } : item;
+              }
+              return item;
             })
           }));
         }
@@ -340,7 +426,7 @@ export const useNewsStore = create<NewsState>((set, get) => ({
       }));
       // Add to playlist for this user
       if (upsertResult && upsertResult.data && upsertResult.data.id) {
-        await upsertUserNewsMeta(user.id, upsertResult.data.id, { inPlaylist: true });
+        await upsertUserNewsMeta(user.id, upsertResult.data.id, { in_playlist: true });
       }
       console.log('[TLDR] Updated local state and playlist');
     } catch (error) {
@@ -360,6 +446,8 @@ export const useNewsStore = create<NewsState>((set, get) => ({
   toggleBookmark: async (newsItemId: string) => {
     const user = useAuthStore.getState().user;
     if (!user) return;
+    
+    // Update UI immediately
     set(state => ({
       newsItems: state.newsItems.map(item =>
         item.id === newsItemId
@@ -367,15 +455,75 @@ export const useNewsStore = create<NewsState>((set, get) => ({
           : item
       )
     }));
+    
     const item = get().newsItems.find(item => item.id === newsItemId);
-    if (item && item.id) {
-      await upsertUserNewsMeta(user.id, newsItemId, { bookmarked: !item.bookmarked });
+    if (!item) return;
+    
+    let dbId = item.dbId;
+    
+    // If no database ID exists, create the news record first
+    if (!dbId) {
+      const urlHash = urlToHash(item.sourceUrl);
+      const newsUpsertPayload = {
+        url_hash: urlHash,
+        source_url: item.sourceUrl,
+        title: item.title,
+        summary: item.summary,
+        category: item.category,
+        published_at: item.publishedAt
+      };
+      
+      try {
+        const { data: upsertResult } = await upsertNewsByUrlHash(newsUpsertPayload);
+        if (upsertResult) {
+          dbId = upsertResult.id;
+          // Update the news item with the database ID
+          set(state => ({
+            newsItems: state.newsItems.map(newsItem =>
+              newsItem.id === newsItemId
+                ? { ...newsItem, dbId }
+                : newsItem
+            )
+          }));
+        }
+      } catch (error) {
+        console.error('Error creating news record for bookmark:', error);
+        // Revert UI change if database operation fails
+        set(state => ({
+          newsItems: state.newsItems.map(newsItem =>
+            newsItem.id === newsItemId
+              ? { ...newsItem, bookmarked: !newsItem.bookmarked }
+              : newsItem
+          )
+        }));
+        return;
+      }
+    }
+    
+    // Now save the bookmark with the database ID
+    if (dbId) {
+      try {
+        const updatedItem = get().newsItems.find(newsItem => newsItem.id === newsItemId);
+        await upsertUserNewsMeta(user.id, dbId, { bookmarked: updatedItem?.bookmarked });
+      } catch (error) {
+        console.error('Error saving bookmark:', error);
+        // Revert UI change if database operation fails
+        set(state => ({
+          newsItems: state.newsItems.map(newsItem =>
+            newsItem.id === newsItemId
+              ? { ...newsItem, bookmarked: !newsItem.bookmarked }
+              : newsItem
+          )
+        }));
+      }
     }
   },
 
   togglePlaylist: async (newsItemId: string) => {
     const user = useAuthStore.getState().user;
     if (!user) return;
+    
+    // Update UI immediately
     set(state => ({
       newsItems: state.newsItems.map(item =>
         item.id === newsItemId
@@ -383,9 +531,67 @@ export const useNewsStore = create<NewsState>((set, get) => ({
           : item
       )
     }));
+    
     const item = get().newsItems.find(item => item.id === newsItemId);
-    if (item && item.id) {
-      await upsertUserNewsMeta(user.id, newsItemId, { inPlaylist: !item.inPlaylist });
+    if (!item) return;
+    
+    let dbId = item.dbId;
+    
+    // If no database ID exists, create the news record first
+    if (!dbId) {
+      const urlHash = urlToHash(item.sourceUrl);
+      const newsUpsertPayload = {
+        url_hash: urlHash,
+        source_url: item.sourceUrl,
+        title: item.title,
+        summary: item.summary,
+        category: item.category,
+        published_at: item.publishedAt
+      };
+      
+      try {
+        const { data: upsertResult } = await upsertNewsByUrlHash(newsUpsertPayload);
+        if (upsertResult) {
+          dbId = upsertResult.id;
+          // Update the news item with the database ID
+          set(state => ({
+            newsItems: state.newsItems.map(newsItem =>
+              newsItem.id === newsItemId
+                ? { ...newsItem, dbId }
+                : newsItem
+            )
+          }));
+        }
+      } catch (error) {
+        console.error('Error creating news record for playlist:', error);
+        // Revert UI change if database operation fails
+        set(state => ({
+          newsItems: state.newsItems.map(newsItem =>
+            newsItem.id === newsItemId
+              ? { ...newsItem, inPlaylist: !newsItem.inPlaylist }
+              : newsItem
+          )
+        }));
+        return;
+      }
+    }
+    
+    // Now save the playlist status with the database ID
+    if (dbId) {
+      try {
+        const updatedItem = get().newsItems.find(newsItem => newsItem.id === newsItemId);
+        await upsertUserNewsMeta(user.id, dbId, { in_playlist: updatedItem?.inPlaylist });
+      } catch (error) {
+        console.error('Error saving playlist status:', error);
+        // Revert UI change if database operation fails
+        set(state => ({
+          newsItems: state.newsItems.map(newsItem =>
+            newsItem.id === newsItemId
+              ? { ...newsItem, inPlaylist: !newsItem.inPlaylist }
+              : newsItem
+          )
+        }));
+      }
     }
   },
 }));

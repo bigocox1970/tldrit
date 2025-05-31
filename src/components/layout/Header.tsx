@@ -2,6 +2,7 @@ import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Moon, Sun, User, CheckSquare, Trash2 } from 'lucide-react';
 import { useSummaryStore } from '../../store/summaryStore';
+import { useNewsStore } from '../../store/newsStore';
 
 interface HeaderProps {
   isDarkMode: boolean;
@@ -11,7 +12,27 @@ interface HeaderProps {
 const Header: React.FC<HeaderProps> = ({ isDarkMode, toggleDarkMode }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { selectedSummaries, deleteSummaries, isEditMode, setEditMode } = useSummaryStore();
+  const { 
+    selectedSummaries, 
+    deleteSummaries, 
+    isEditMode, 
+    setEditMode,
+    selectedListenItems,
+    isListenEditMode,
+    setListenEditMode,
+    removeFromPlaylist
+  } = useSummaryStore();
+  
+  const {
+    selectedListenNewsItems,
+    isListenNewsEditMode,
+    setListenNewsEditMode,
+    removeNewsFromPlaylist,
+    selectedSavedNewsItems,
+    isSavedNewsEditMode,
+    setSavedNewsEditMode,
+    deleteSelectedNewsItems
+  } = useNewsStore();
 
   const getPageTitle = () => {
     switch (location.pathname) {
@@ -37,16 +58,43 @@ const Header: React.FC<HeaderProps> = ({ isDarkMode, toggleDarkMode }) => {
   };
 
   const isSavedPage = location.pathname === '/saved';
-  const hasSelections = selectedSummaries.length > 0;
+  const isListenPage = location.pathname === '/listen';
+  const hasSelections = selectedSummaries.length > 0 || selectedSavedNewsItems.length > 0;
+  const hasListenSelections = selectedListenItems.length > 0 || selectedListenNewsItems.length > 0;
+  const isInEditMode = isEditMode || isListenEditMode || isListenNewsEditMode || isSavedNewsEditMode;
 
   const handleDeleteClick = async () => {
-    if (window.confirm('Are you sure you want to delete the selected TLDRs?')) {
-      await deleteSummaries(selectedSummaries);
+    if (isSavedPage && window.confirm('Are you sure you want to delete the selected items?')) {
+      // Handle both summary and news item deletion on saved page
+      if (selectedSummaries.length > 0) {
+        await deleteSummaries(selectedSummaries);
+      }
+      if (selectedSavedNewsItems.length > 0) {
+        await deleteSelectedNewsItems(selectedSavedNewsItems);
+      }
+    } else if (isListenPage && window.confirm('Are you sure you want to remove the selected items from your playlist?')) {
+      // Handle both summary and news item removal from playlist
+      if (selectedListenItems.length > 0) {
+        await removeFromPlaylist(selectedListenItems);
+      }
+      if (selectedListenNewsItems.length > 0) {
+        await removeNewsFromPlaylist(selectedListenNewsItems);
+      }
     }
   };
 
   const handleSelectClick = () => {
-    setEditMode(!isEditMode);
+    if (isSavedPage) {
+      // Toggle saved edit mode for both summaries and news
+      const newEditMode = !isEditMode && !isSavedNewsEditMode;
+      setEditMode(newEditMode);
+      setSavedNewsEditMode(newEditMode);
+    } else if (isListenPage) {
+      // Toggle listen edit mode for both summaries and news
+      const newEditMode = !isListenEditMode && !isListenNewsEditMode;
+      setListenEditMode(newEditMode);
+      setListenNewsEditMode(newEditMode);
+    }
   };
 
   return (
@@ -77,7 +125,7 @@ const Header: React.FC<HeaderProps> = ({ isDarkMode, toggleDarkMode }) => {
           {/* Search and actions */}
           <div className="hidden md:flex items-center space-x-4 z-10">
             <div className="flex items-center space-x-2">
-              {isSavedPage && !hasSelections && (
+              {(isSavedPage && !hasSelections) && (
                 <button
                   type="button"
                   onClick={handleSelectClick}
@@ -87,12 +135,22 @@ const Header: React.FC<HeaderProps> = ({ isDarkMode, toggleDarkMode }) => {
                   <CheckSquare size={20} />
                 </button>
               )}
-              {hasSelections && (
+              {(isListenPage && !hasListenSelections) && (
+                <button
+                  type="button"
+                  onClick={handleSelectClick}
+                  className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  title={isInEditMode ? "Exit select mode" : "Enter select mode"}
+                >
+                  <CheckSquare size={20} />
+                </button>
+              )}
+              {(hasSelections || hasListenSelections) && (
                 <button
                   type="button"
                   onClick={handleDeleteClick}
                   className="p-2 rounded-full text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/20"
-                  title="Delete selected"
+                  title={isSavedPage ? "Delete selected" : "Remove from playlist"}
                 >
                   <Trash2 size={20} />
                 </button>
@@ -116,7 +174,7 @@ const Header: React.FC<HeaderProps> = ({ isDarkMode, toggleDarkMode }) => {
 
           {/* Mobile actions */}
           <div className="md:hidden flex items-center space-x-2 z-10">
-            {isSavedPage && !hasSelections && (
+            {(isSavedPage && !hasSelections) && (
               <button
                 type="button"
                 onClick={handleSelectClick}
@@ -126,12 +184,22 @@ const Header: React.FC<HeaderProps> = ({ isDarkMode, toggleDarkMode }) => {
                 <CheckSquare size={20} />
               </button>
             )}
-            {hasSelections && (
+            {(isListenPage && !hasListenSelections) && (
+              <button
+                type="button"
+                onClick={handleSelectClick}
+                className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                title={isInEditMode ? "Exit select mode" : "Enter select mode"}
+              >
+                <CheckSquare size={20} />
+              </button>
+            )}
+            {(hasSelections || hasListenSelections) && (
               <button
                 type="button"
                 onClick={handleDeleteClick}
                 className="p-2 rounded-full text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/20"
-                title="Delete selected"
+                title={isSavedPage ? "Delete selected" : "Remove from playlist"}
               >
                 <Trash2 size={20} />
               </button>

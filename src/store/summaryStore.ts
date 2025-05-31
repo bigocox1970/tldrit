@@ -21,7 +21,7 @@
 import { create } from 'zustand';
 import { Summary, SummaryRequest } from '../types';
 import { extractContentFromUrl, generateAudio, processFileContent, summarizeContent } from '../lib/ai';
-import { getSummaries, saveSummary, deleteSummaries, updateSummary } from '../lib/supabase';
+import { getSummaries, saveSummary, deleteSummaries, updateSummary, updateSummaryPlaylist } from '../lib/supabase';
 import { useAuthStore } from './authStore';
 
 interface SummaryState {
@@ -37,6 +37,13 @@ interface SummaryState {
   setSelectedSummaries: (summaryIds: string[]) => void;
   isEditMode: boolean;
   setEditMode: (isEdit: boolean) => void;
+  // Listen page specific selection state
+  selectedListenItems: string[];
+  setSelectedListenItems: (itemIds: string[]) => void;
+  isListenEditMode: boolean;
+  setListenEditMode: (isEdit: boolean) => void;
+  removeFromPlaylist: (itemIds: string[]) => Promise<void>;
+  togglePlaylist: (summaryId: string) => Promise<void>;
 }
 
 export const useSummaryStore = create<SummaryState>((set, get) => ({
@@ -46,6 +53,8 @@ export const useSummaryStore = create<SummaryState>((set, get) => ({
   error: null,
   selectedSummaries: [],
   isEditMode: false,
+  selectedListenItems: [],
+  isListenEditMode: false,
   
   setSelectedSummaries: (summaryIds: string[]) => {
     set({ selectedSummaries: summaryIds });
@@ -79,6 +88,7 @@ export const useSummaryStore = create<SummaryState>((set, get) => ({
         audioUrl: item.audio_url,
         isEli5: item.is_eli5,
         summaryLevel: item.summary_level,
+        inPlaylist: item.in_playlist || false,
       })) || [];
       
       set({ 
@@ -173,6 +183,7 @@ export const useSummaryStore = create<SummaryState>((set, get) => ({
         audioUrl: data?.[0].audio_url,
         isEli5: data?.[0].is_eli5,
         summaryLevel: data?.[0].summary_level,
+        inPlaylist: data?.[0].in_playlist || false,
       };
       
       set(state => ({ 
@@ -251,6 +262,71 @@ export const useSummaryStore = create<SummaryState>((set, get) => ({
     } catch {
       set({ 
         error: 'Failed to delete summaries', 
+        isLoading: false 
+      });
+    }
+  },
+
+  togglePlaylist: async (summaryId: string) => {
+    const user = useAuthStore.getState().user;
+    if (!user) return;
+    
+    set({ isLoading: true, error: null });
+    try {
+      const summary = get().summaries.find(s => s.id === summaryId);
+      if (!summary) return;
+      
+      const updatedSummary = { ...summary, inPlaylist: !summary.inPlaylist };
+      
+      await updateSummaryPlaylist(summaryId, updatedSummary.inPlaylist);
+      
+      set(state => ({
+        summaries: state.summaries.map(s => 
+          s.id === summaryId ? updatedSummary : s
+        ),
+        currentSummary: state.currentSummary?.id === summaryId 
+          ? updatedSummary 
+          : state.currentSummary,
+        isLoading: false,
+        error: null,
+      }));
+    } catch {
+      set({ 
+        error: 'Failed to toggle playlist', 
+        isLoading: false 
+      });
+    }
+  },
+
+  // Listen page specific methods
+  setSelectedListenItems: (itemIds: string[]) => {
+    set({ selectedListenItems: itemIds });
+  },
+
+  setListenEditMode: (isEdit: boolean) => {
+    set({ isListenEditMode: isEdit, selectedListenItems: isEdit ? [] : [] });
+  },
+
+  removeFromPlaylist: async (itemIds: string[]) => {
+    const user = useAuthStore.getState().user;
+    if (!user) return;
+
+    set({ isLoading: true, error: null });
+    try {
+      // Remove items from playlist by setting inPlaylist to false
+      await Promise.all(itemIds.map(id => 
+        get().togglePlaylist(id)
+      ));
+      
+      // Clear selection and exit edit mode
+      set({ 
+        selectedListenItems: [], 
+        isListenEditMode: false,
+        isLoading: false 
+      });
+    } catch {
+      set({ 
+        error: 'Failed to remove items from playlist', 
         isLoading: false 
       });
     }
