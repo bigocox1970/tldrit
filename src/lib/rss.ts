@@ -16,6 +16,23 @@
  */
 
 import { NewsItem } from '../types';
+import { XMLParser } from 'fast-xml-parser';
+
+interface RSSItem {
+  title?: { '#text'?: string } | string;
+  link?: { '#text'?: string; '@_href'?: string } | string;
+  description?: string;
+  summary?: string;
+  'content:encoded'?: string;
+  content?: string;
+  pubDate?: string;
+  published?: string;
+  updated?: string;
+  category?: { '#text'?: string } | string;
+  'media:content'?: { '@_url'?: string };
+  'media:thumbnail'?: { '@_url'?: string };
+  enclosure?: { '@_type'?: string; '@_url'?: string };
+}
 
 // RSS feed sources organized by category
 const RSS_SOURCES = {
@@ -54,13 +71,10 @@ async function fetchRSSFeed(url: string): Promise<NewsItem[]> {
   try {
     console.log(`Fetching RSS feed for ${url}...`);
     
-    // Use allorigins.win as CORS proxy
-    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-    
-    const response = await fetch(proxyUrl, {
-      method: 'GET',
+    const response = await fetch(url, {
       headers: {
-        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'application/rss+xml,application/xml;q=0.9,*/*;q=0.8',
       }
     });
 
@@ -68,67 +82,107 @@ async function fetchRSSFeed(url: string): Promise<NewsItem[]> {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    const data = await response.json();
+    const xmlText = await response.text();
     
-    if (!data.contents) {
-      throw new Error('No content received from proxy');
+    // Parse the RSS XML using fast-xml-parser
+    const parser = new XMLParser({
+      ignoreAttributes: false,
+      attributeNamePrefix: '@_',
+      textNodeName: '#text'
+    });
+    
+    const result = parser.parse(xmlText);
+    const channel = result.rss?.channel || result.feed;
+    
+    if (!channel) {
+      throw new Error('Invalid RSS feed format');
     }
 
-    // Parse the RSS XML
-    const parser = new DOMParser();
-    const xmlDoc = parser.parseFromString(data.contents, 'text/xml');
-    
-    // Check for parsing errors
-    const parseError = xmlDoc.querySelector('parsererror');
-    if (parseError) {
-      throw new Error('Failed to parse RSS XML');
-    }
-
-    const items = xmlDoc.querySelectorAll('item');
+    const items = channel.item || channel.entry || [];
     const newsItems: NewsItem[] = [];
 
-    items.forEach((item, index) => {
+    (Array.isArray(items) ? items : [items]).forEach((item: RSSItem, index: number) => {
       try {
-        const title = item.querySelector('title')?.textContent?.trim();
-        const link = item.querySelector('link')?.textContent?.trim();
-        const description = item.querySelector('description')?.textContent?.trim();
-        const pubDate = item.querySelector('pubDate')?.textContent?.trim();
-        const category = item.querySelector('category')?.textContent?.trim() || 'general';
+        // Extract title with type checking
+        let title: string | undefined;
+        if (typeof item.title === 'string') {
+          title = item.title;
+        } else if (item.title?.['#text']) {
+          title = item.title['#text'];
+        }
 
-        if (title && link && description) {
-          // Extract image URL from description or content (original working approach)
+        // Extract link with type checking
+        let link: string | undefined;
+        if (typeof item.link === 'string') {
+          link = item.link;
+        } else if (item.link?.['#text']) {
+          link = item.link['#text'];
+        } else if (item.link?.['@_href']) {
+          link = item.link['@_href'];
+        }
+
+        const description = item.description || item.summary || '';
+        const content = item['content:encoded'] || item.content || '';
+        const pubDate = item.pubDate || item.published || item.updated || new Date().toISOString();
+        
+        // Extract category with type checking
+        let category = 'general';
+        if (typeof item.category === 'string') {
+          category = item.category;
+        } else if (item.category?.['#text']) {
+          category = item.category['#text'];
+        }
+        category = category.toLowerCase();
+
+        if (title && link) {
+          // Extract image URL using multiple methods
           let imageUrl = '';
-          const imgMatch = description.match(/<img[^>]+src="([^">]+)"/);
-          if (imgMatch) {
-            imageUrl = imgMatch[1];
+          
+          // Try media:content
+          if (item['media:content']?.['@_url']) {
+            imageUrl = item['media:content']['@_url'];
           }
-
-          // Also try single quotes
-          if (!imageUrl) {
-            const imgMatchSingle = description.match(/<img[^>]+src='([^'>]+)'/);
-            if (imgMatchSingle) {
-              imageUrl = imgMatchSingle[1];
-            }
-          }
-
+          
           // Try media:thumbnail
+          if (!imageUrl && item['media:thumbnail']?.['@_url']) {
+            imageUrl = item['media:thumbnail']['@_url'];
+          }
+          
+          // Try enclosure
+          if (!imageUrl && item.enclosure?.['@_type']?.startsWith('image/')) {
+            imageUrl = item.enclosure['@_url'] || '';
+          }
+          
+          // Try og:image or twitter:image in content
           if (!imageUrl) {
-            const mediaThumbnail = item.querySelector('media\\:thumbnail');
-            if (mediaThumbnail) {
-              imageUrl = mediaThumbnail.getAttribute('url') || '';
+            const fullContent = content || description || '';
+            const metaMatch = fullContent.match(/<meta[^>]+property="og:image"[^>]+content="([^">]+)"/i) ||
+                           fullContent.match(/<meta[^>]+name="twitter:image"[^>]+content="([^">]+)"/i);
+            if (metaMatch) {
+              imageUrl = metaMatch[1];
             }
           }
 
-          // Clean up description by removing HTML tags
+          // Try regular image tags
+          if (!imageUrl) {
+            const fullContent = content || description || '';
+            const imgMatch = fullContent.match(/<img[^>]+src="([^">]+)"/i) ||
+                          fullContent.match(/<img[^>]+src='([^'>]+)'/i);
+            if (imgMatch) {
+              imageUrl = imgMatch[1];
+            }
+          }
+
+          // Clean up description
           const cleanDescription = description.replace(/<[^>]*>/g, '').trim();
 
           newsItems.push({
             id: `${url}-${index}-${Date.now()}`,
             title,
             sourceUrl: link,
-            category: category.toLowerCase(),
+            category,
             summary: cleanDescription.substring(0, 300) + (cleanDescription.length > 300 ? '...' : ''),
-            publishedAt: pubDate || new Date().toISOString(),
+            publishedAt: pubDate,
             imageUrl: imageUrl || undefined,
           });
         }

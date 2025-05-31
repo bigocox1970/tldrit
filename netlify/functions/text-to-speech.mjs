@@ -137,13 +137,14 @@ export const handler = async function(event, context) {
       .from('tldrit')
       .getPublicUrl(fileName);
 
-    // If this is a news TLDR, store the audio URL in the news_items table
+    // If this is a news TLDR, store the audio URL in the news table
     if (type === 'news' && sourceUrl) {
       const urlHash = crypto.createHash('md5').update(sourceUrl).digest('hex');
       await supabase
-        .from('news_items')
+        .from('news')
         .upsert({
           url_hash: urlHash,
+          source_url: sourceUrl,
           audio_url: publicUrl,
           updated_at: new Date().toISOString()
         }, {

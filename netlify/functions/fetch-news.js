@@ -20,71 +20,131 @@ const RSS_FEEDS = {
   ai: "https://www.artificialintelligence-news.com/feed/",
 };
 
-// Function to extract image from content
-function extractImageFromContent(content) {
-  if (!content) return null;
-  
-  // Try to find img tags in content
-  const imgMatch = content.match(/<img[^>]+src="([^">]+)"/i);
-  if (imgMatch) {
-    return imgMatch[1];
-  }
-  
-  // Try to find image URLs in content
-  const urlMatch = content.match(/(https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp))/i);
-  if (urlMatch) {
-    return urlMatch[1];
-  }
-  
-  return null;
-}
-
-// Function to get a fallback image based on category
-function getCategoryImage(category) {
-  const categoryImages = {
-    technology: "https://images.unsplash.com/photo-1518709268805-4e9042af2176?w=400&h=200&fit=crop",
-    world: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=200&fit=crop",
-    business: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=200&fit=crop",
-    science: "https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=400&h=200&fit=crop",
-    crypto: "https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=400&h=200&fit=crop",
-    health: "https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=200&fit=crop",
-    entertainment: "https://images.unsplash.com/photo-1489599856641-b2d54d0b0b78?w=400&h=200&fit=crop",
-    sports: "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=400&h=200&fit=crop",
-    politics: "https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?w=400&h=200&fit=crop",
-    ai: "https://images.unsplash.com/photo-1677442136019-21780ecad995?w=400&h=200&fit=crop",
-  };
-  
-  return categoryImages[category] || "https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=400&h=200&fit=crop";
-}
-
 // Function to generate consistent ID from source URL
 function generateNewsId(sourceUrl) {
   return crypto.createHash('md5').update(sourceUrl).digest('hex');
 }
 
-exports.handler = async function(event, context) {
-  // Set CORS headers
-  const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  };
+function extractVentureBeatImage(content) {
+  if (!content) return null;
+  
+  try {
+    // Try meta tags first with more specific VentureBeat patterns
+    const metaPatterns = [
+      /<meta[^>]+property="og:image"[^>]+content="([^">]+)"/i,
+      /<meta[^>]+name="twitter:image"[^>]+content="([^">]+)"/i,
+      /<meta[^>]+property="og:image:url"[^>]+content="([^">]+)"/i,
+      /<meta[^>]+name="sailthru.image.full"[^>]+content="([^">]+)"/i
+    ];
 
-  // Handle preflight requests
-  if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 200,
-      headers,
-      body: '',
-    };
+    for (const pattern of metaPatterns) {
+      const match = content.match(pattern);
+      if (match && match[1]) {
+        const imageUrl = match[1].trim();
+        if (imageUrl.startsWith('http')) {
+          console.log('Found VentureBeat image in meta tags:', imageUrl);
+          return imageUrl;
+        }
+      }
+    }
+
+    // Try VentureBeat specific image patterns
+    const imagePatterns = [
+      // Featured image container
+      /<div[^>]*class="[^"]*article-featured-image[^"]*"[^>]*>.*?<img[^>]+src="([^">]+)"/i,
+      // WordPress featured image
+      /<img[^>]+class="[^"]*wp-post-image[^"]*"[^>]+src="([^">]+)"/i,
+      // Article header image
+      /<div[^>]*class="[^"]*article-header-image[^"]*"[^>]*>.*?<img[^>]+src="([^">]+)"/i,
+      // General article images
+      /<div[^>]*class="[^"]*article-content[^"]*"[^>]*>.*?<img[^>]+src="([^">]+)"/i,
+      // Fallback to any image in the content
+      /<img[^>]+src="([^">]+)"/i
+    ];
+
+    for (const pattern of imagePatterns) {
+      const match = content.match(pattern);
+      if (match && match[1]) {
+        const imageUrl = match[1].trim();
+        if (imageUrl.startsWith('http') && !imageUrl.includes('advertisement')) {
+          console.log('Found VentureBeat image in content:', imageUrl);
+          return imageUrl;
+        }
+      }
+    }
+
+    console.log('No suitable image found in VentureBeat content');
+    return null;
+  } catch (error) {
+    console.error('Error extracting VentureBeat image:', error);
+    return null;
   }
+}
 
+// Function to extract image from content
+function extractImageFromContent(content, sourceUrl) {
+  if (!content) return null;
+  
+  try {
+    // Special handling for venturebeat.com
+    if (sourceUrl && sourceUrl.includes('venturebeat.com')) {
+      console.log('Processing VentureBeat article:', sourceUrl);
+      const image = extractVentureBeatImage(content);
+      if (image) return image;
+    }
+    
+    // Fallback to general image extraction
+    // Try meta tags first
+    const metaMatch = content.match(/<meta[^>]+property="og:image"[^>]+content="([^">]+)"/i) ||
+                     content.match(/<meta[^>]+name="twitter:image"[^>]+content="([^">]+)"/i);
+    if (metaMatch) {
+      return metaMatch[1];
+    }
+    
+    // Try to find any suitable image
+    const imgMatch = content.match(/<img[^>]+src="([^">]+)"/i);
+    if (imgMatch && !imgMatch[1].includes('advertisement')) {
+      return imgMatch[1];
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error extracting image from content:', error);
+    return null;
+  }
+}
+
+// Function to get default category image
+function getCategoryImage(category) {
+  const defaultImages = {
+    technology: '/images/categories/technology.jpg',
+    world: '/images/categories/world.jpg',
+    business: '/images/categories/business.jpg',
+    science: '/images/categories/science.jpg',
+    crypto: '/images/categories/crypto.jpg',
+    health: '/images/categories/health.jpg',
+    entertainment: '/images/categories/entertainment.jpg',
+    sports: '/images/categories/sports.jpg',
+    politics: '/images/categories/politics.jpg',
+    ai: '/images/categories/ai.jpg',
+  };
+  return defaultImages[category] || '/images/categories/default.jpg';
+}
+
+exports.handler = async function(event) {
   try {
     const parser = new Parser({
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'application/rss+xml,application/xml;q=0.9,*/*;q=0.8',
+      },
+      timeout: 10000,
+      maxRedirects: 5,
       customFields: {
         item: [
           ['media:content', 'mediaContent'],
           ['media:thumbnail', 'mediaThumbnail'],
+          ['media:group', 'mediaGroup'],
           ['enclosure', 'enclosure'],
           ['description', 'description'],
           ['content:encoded', 'contentEncoded']
@@ -92,137 +152,76 @@ exports.handler = async function(event, context) {
       }
     });
 
-    let categories = ['technology', 'world', 'business', 'science'];
-    if (event.body) {
-      try {
-        const body = JSON.parse(event.body);
-        if (body.categories && Array.isArray(body.categories)) {
-          categories = body.categories;
-        }
-      } catch (e) {
-        console.log('Could not parse request body, using default categories');
-      }
+    const { category } = JSON.parse(event.body);
+    
+    if (!RSS_FEEDS[category]) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ error: 'Invalid category' })
+      };
     }
 
-    console.log('Fetching news for categories:', categories);
+    console.log('Fetching news for category:', category);
+    console.log('RSS feed URL:', RSS_FEEDS[category]);
 
-    const newsItems = [];
-    const promises = categories.map(async (category) => {
-      if (!RSS_FEEDS[category]) {
-        console.log(`No RSS feed found for category: ${category}`);
-        return;
+    const feed = await parser.parseURL(RSS_FEEDS[category]);
+    console.log('Feed parsed successfully');
+
+    const items = await Promise.all(feed.items.slice(0, 3).map(async (item) => {
+      console.log('Processing item:', item.title);
+      
+      let imageUrl = null;
+
+      // Try to get image from media fields first
+      if (item.mediaContent && item.mediaContent.$ && item.mediaContent.$.url) {
+        imageUrl = item.mediaContent.$.url;
+        console.log('Found image in mediaContent:', imageUrl);
+      } else if (item.mediaThumbnail && item.mediaThumbnail.$ && item.mediaThumbnail.$.url) {
+        imageUrl = item.mediaThumbnail.$.url;
+        console.log('Found image in mediaThumbnail:', imageUrl);
+      } else if (item.enclosure && item.enclosure.url) {
+        imageUrl = item.enclosure.url;
+        console.log('Found image in enclosure:', imageUrl);
       }
 
-      try {
-        console.log(`Fetching RSS feed for ${category}: ${RSS_FEEDS[category]}`);
-        const feed = await parser.parseURL(RSS_FEEDS[category]);
-        
-        const items = feed.items.slice(0, 3).map((item) => {
-          // Extract image from multiple sources
-          let imageUrl = null;
-          
-          // Try enclosure first (common in RSS)
-          if (item.enclosure && item.enclosure.url) {
-            imageUrl = item.enclosure.url;
-          }
-          // Try media content
-          else if (item.mediaContent && item.mediaContent.$) {
-            imageUrl = item.mediaContent.$.url;
-          }
-          // Try media thumbnail
-          else if (item.mediaThumbnail && item.mediaThumbnail.$) {
-            imageUrl = item.mediaThumbnail.$.url;
-          }
-          // Try to extract from content
-          else if (item.contentEncoded) {
-            imageUrl = extractImageFromContent(item.contentEncoded);
-          }
-          else if (item.content) {
-            imageUrl = extractImageFromContent(item.content);
-          }
-          else if (item.description) {
-            imageUrl = extractImageFromContent(item.description);
-          }
-          
-          // Use category fallback image if no image found
-          if (!imageUrl) {
-            imageUrl = getCategoryImage(category);
-          }
-
-          // Clean up description for summary
-          let summary = item.description || item.content || item.contentEncoded || '';
-          // Remove HTML tags
-          summary = summary.replace(/<[^>]*>/g, '');
-          // Limit length
-          if (summary.length > 300) {
-            summary = summary.substring(0, 300) + '...';
-          }
-
-          const urlHash = generateNewsId(item.link || '');
-
-          return {
-            id: urlHash,
-            title: item.title || 'No title',
-            summary: summary || 'No summary available',
-            sourceUrl: item.link || '',
-            category: category,
-            publishedAt: item.pubDate ? new Date(item.pubDate).toISOString() : new Date().toISOString(),
-            imageUrl: imageUrl,
-            audioUrl: null, // Will be populated from database
-            tldr: null
-          };
-        });
-
-        // Fetch audio URLs from database
-        const urlHashes = items.map(item => item.id);
-        const { data: audioData } = await supabase
-          .from('news_items')
-          .select('url_hash, audio_url')
-          .in('url_hash', urlHashes);
-
-        // Map audio URLs to items
-        if (audioData) {
-          const audioMap = Object.fromEntries(
-            audioData.map(item => [item.url_hash, item.audio_url])
-          );
-          items.forEach(item => {
-            item.audioUrl = audioMap[item.id] || null;
-          });
-        }
-
-        newsItems.push(...items);
-      } catch (error) {
-        console.error(`Error fetching ${category} feed:`, error);
+      // If no image found in media fields, try to extract from content
+      if (!imageUrl && (item.content || item['content:encoded'] || item.description)) {
+        const content = item['content:encoded'] || item.content || item.description;
+        imageUrl = extractImageFromContent(content, item.link);
+        console.log('Extracted image from content:', imageUrl);
       }
-    });
 
-    await Promise.all(promises);
+      // If still no image, use category default
+      if (!imageUrl) {
+        imageUrl = getCategoryImage(category);
+        console.log('Using default category image:', imageUrl);
+      }
 
-    // Sort by published date (newest first)
-    newsItems.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+      const newsId = generateNewsId(item.link);
+      console.log('Generated news ID:', newsId);
 
-    console.log(`Successfully fetched ${newsItems.length} news items`);
+      return {
+        id: newsId,
+        title: item.title,
+        description: item.contentSnippet || item.description,
+        link: item.link,
+        image: imageUrl,
+        pubDate: item.pubDate || item.isoDate,
+        category
+      };
+    }));
+
+    console.log('Processed all items successfully');
 
     return {
       statusCode: 200,
-      headers,
-      body: JSON.stringify({
-        success: true,
-        newsItems: newsItems,
-        count: newsItems.length
-      }),
+      body: JSON.stringify(items)
     };
-
   } catch (error) {
-    console.error('Error in fetch-news function:', error);
+    console.error('Error in fetch-news handler:', error);
     return {
       statusCode: 500,
-      headers,
-      body: JSON.stringify({
-        success: false,
-        error: 'Failed to fetch news',
-        details: error.message
-      }),
+      body: JSON.stringify({ error: error.message })
     };
   }
 };

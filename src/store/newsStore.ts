@@ -369,7 +369,7 @@ export const useNewsStore = create<NewsState>((set, get) => ({
     }));
     const item = get().newsItems.find(item => item.id === newsItemId);
     if (item && item.id) {
-      await upsertUserNewsMeta(user.id, item.id, { bookmarked: !item.bookmarked });
+      await upsertUserNewsMeta(user.id, newsItemId, { bookmarked: !item.bookmarked });
     }
   },
 
@@ -385,7 +385,7 @@ export const useNewsStore = create<NewsState>((set, get) => ({
     }));
     const item = get().newsItems.find(item => item.id === newsItemId);
     if (item && item.id) {
-      await upsertUserNewsMeta(user.id, item.id, { inPlaylist: !item.inPlaylist });
+      await upsertUserNewsMeta(user.id, newsItemId, { inPlaylist: !item.inPlaylist });
     }
   },
 }));
