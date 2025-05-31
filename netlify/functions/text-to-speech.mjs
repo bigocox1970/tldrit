@@ -32,7 +32,7 @@ export const handler = async function(event, context) {
   }
 
   try {
-    const { text } = JSON.parse(event.body);
+    const { text, isPremium, type } = JSON.parse(event.body);
     const authHeader = event.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -69,8 +69,8 @@ export const handler = async function(event, context) {
       };
     }
 
-    // Check plan/credits
-    if (profile.plan !== 'pro' && profile.credits <= 0) {
+    // Allow free users to generate audio for news TLDRs
+    if (type !== 'news' && profile.plan !== 'pro' && profile.credits <= 0) {
       return {
         statusCode: 403,
         headers,
@@ -78,8 +78,8 @@ export const handler = async function(event, context) {
       };
     }
 
-    // If not pro, decrement credits
-    if (profile.plan !== 'pro') {
+    // If not pro and not a news TLDR, decrement credits
+    if (profile.plan !== 'pro' && type !== 'news') {
       await supabase
         .from('profiles')
         .update({ credits: profile.credits - 1 })

@@ -1,5 +1,6 @@
 import React from 'react';
-import { FileText, Newspaper, Headphones, Settings } from 'lucide-react';
+import { FileText, Newspaper, Headphones, Settings, Download } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import Card, { CardContent } from '../ui/Card';
 
 const features = [
@@ -34,6 +35,8 @@ const borderColors = [
 ];
 
 const FeatureSection: React.FC = () => {
+  const navigate = useNavigate();
+
   return (
     <div className="py-12">
       <h2 className="text-2xl font-bold text-center mb-8">
@@ -55,6 +58,22 @@ const FeatureSection: React.FC = () => {
             </CardContent>
           </Card>
         ))}
+
+        {/* PWA Installation Card */}
+        <Card
+          onClick={() => navigate('/install')}
+          className="border-2 border-green-500 col-span-2 cursor-pointer hover:shadow-lg transition-shadow"
+        >
+          <CardContent className="h-full text-left p-4 flex flex-col">
+            <div className="w-8 h-8 rounded-lg mb-2 bg-gradient-to-tr from-blue-600 via-red-500 to-yellow-400 flex items-center justify-center">
+              <Download size={18} className="text-white" />
+            </div>
+            <h3 className="font-semibold text-base mb-1 mt-1">Install the Web App</h3>
+            <p className="text-gray-600 dark:text-gray-400 text-xs leading-snug">
+              Save to your home screen with an icon and use just like a native app.
+            </p>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

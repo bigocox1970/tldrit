@@ -207,7 +207,7 @@ const NewsItem: React.FC<NewsItemProps> = ({ item }) => {
                           ? 'Pause audio'
                           : newsItem.audioUrl
                           ? 'Play audio'
-                          : 'Generate audio'}
+                          : 'Generate audio (Free for news TLDRs!)'}
                       >
                         <Volume2
                           size={20}

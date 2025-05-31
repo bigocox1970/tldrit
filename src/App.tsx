@@ -16,6 +16,7 @@ import RegisterPage from './pages/RegisterPage';
 import ProfilePage from './pages/ProfilePage';
 import PricingPlans from './components/subscription/PricingPlans';
 import TermsPage from './pages/terms';
+import PWAInstallGuide from './pages/PWAInstallGuide';
 
 // Define protected route component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -57,6 +58,7 @@ function App() {
           <Route path="register" element={<RegisterPage />} />
           <Route path="pricing" element={<PricingPlans />} />
           <Route path="terms/*" element={<TermsPage />} />
+          <Route path="install" element={<PWAInstallGuide />} />
         </Route>
       </Routes>
     </Router>

@@ -216,30 +216,13 @@ export const useNewsStore = create<NewsState>((set, get) => ({
   generateAudioForNewsItem: async (newsItemId: string) => {
     const user = useAuthStore.getState().user;
     if (!user) return;
-    
+
     const newsItem = get().newsItems.find(item => item.id === newsItemId);
     if (!newsItem) return;
+
     const urlHash = urlToHash(newsItem.sourceUrl);
-
-    // Always check Supabase for latest audio_url before generating
-    const { data: dbNews, error: dbError } = await getNewsByUrlHash(urlHash);
-    if (dbError) {
-      set({ error: 'Failed to check audio in database' });
-      return;
-    }
-    if (dbNews && dbNews.audio_url) {
-      // Update local store and return
-      set(state => ({
-        newsItems: state.newsItems.map(item =>
-          item.id === newsItemId ? { ...item, audioUrl: dbNews.audio_url } : item
-        ),
-        isLoading: false,
-        error: null,
-      }));
-      return;
-    }
-
     set({ isLoading: true, error: null });
+
     try {
       const audioText = newsItem.tldr || newsItem.summary;
       const audioUrl = await generateAudio(audioText, user.isPremium, 'news');
