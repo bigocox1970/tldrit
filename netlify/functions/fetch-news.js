@@ -1,4 +1,11 @@
 const Parser = require('rss-parser');
+const crypto = require('crypto');
+const { createClient } = require('@supabase/supabase-js');
+
+const supabase = createClient(
+  process.env.VITE_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
 const RSS_FEEDS = {
   technology: "https://www.theverge.com/rss/index.xml",
@@ -50,6 +57,11 @@ function getCategoryImage(category) {
   return categoryImages[category] || "https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=400&h=200&fit=crop";
 }
 
+// Function to generate consistent ID from source URL
+function generateNewsId(sourceUrl) {
+  return crypto.createHash('md5').update(sourceUrl).digest('hex');
+}
+
 exports.handler = async function(event, context) {
   // Set CORS headers
   const headers = {
@@ -80,7 +92,6 @@ exports.handler = async function(event, context) {
       }
     });
 
-    // Parse request body to get categories
     let categories = ['technology', 'world', 'business', 'science'];
     if (event.body) {
       try {
@@ -106,7 +117,7 @@ exports.handler = async function(event, context) {
         console.log(`Fetching RSS feed for ${category}: ${RSS_FEEDS[category]}`);
         const feed = await parser.parseURL(RSS_FEEDS[category]);
         
-        const items = feed.items.slice(0, 3).map((item, index) => {
+        const items = feed.items.slice(0, 3).map((item) => {
           // Extract image from multiple sources
           let imageUrl = null;
           
@@ -147,18 +158,37 @@ exports.handler = async function(event, context) {
             summary = summary.substring(0, 300) + '...';
           }
 
+          const urlHash = generateNewsId(item.link || '');
+
           return {
-            id: `${category}-${index}-${Date.now()}`,
+            id: urlHash,
             title: item.title || 'No title',
             summary: summary || 'No summary available',
             sourceUrl: item.link || '',
             category: category,
             publishedAt: item.pubDate ? new Date(item.pubDate).toISOString() : new Date().toISOString(),
             imageUrl: imageUrl,
-            audioUrl: null,
+            audioUrl: null, // Will be populated from database
             tldr: null
           };
         });
+
+        // Fetch audio URLs from database
+        const urlHashes = items.map(item => item.id);
+        const { data: audioData } = await supabase
+          .from('news_items')
+          .select('url_hash, audio_url')
+          .in('url_hash', urlHashes);
+
+        // Map audio URLs to items
+        if (audioData) {
+          const audioMap = Object.fromEntries(
+            audioData.map(item => [item.url_hash, item.audio_url])
+          );
+          items.forEach(item => {
+            item.audioUrl = audioMap[item.id] || null;
+          });
+        }
 
         newsItems.push(...items);
       } catch (error) {

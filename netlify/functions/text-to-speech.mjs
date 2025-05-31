@@ -1,5 +1,6 @@
 import fetch from 'node-fetch';
 import { createClient } from '@supabase/supabase-js';
+import crypto from 'crypto';
 
 const supabase = createClient(
   process.env.VITE_SUPABASE_URL,
@@ -32,7 +33,7 @@ export const handler = async function(event, context) {
   }
 
   try {
-    const { text, isPremium, type } = JSON.parse(event.body);
+    const { text, isPremium, type, sourceUrl } = JSON.parse(event.body);
     const authHeader = event.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -135,6 +136,20 @@ export const handler = async function(event, context) {
     const { data: { publicUrl } } = supabase.storage
       .from('tldrit')
       .getPublicUrl(fileName);
+
+    // If this is a news TLDR, store the audio URL in the news_items table
+    if (type === 'news' && sourceUrl) {
+      const urlHash = crypto.createHash('md5').update(sourceUrl).digest('hex');
+      await supabase
+        .from('news_items')
+        .upsert({
+          url_hash: urlHash,
+          audio_url: publicUrl,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'url_hash'
+        });
+    }
 
     return {
       statusCode: 200,

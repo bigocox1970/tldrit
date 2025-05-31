@@ -11,6 +11,12 @@ interface TLDROptions {
   eli5Level?: number;
 }
 
+interface UserNewsMeta {
+  news_id: string;
+  bookmarked: boolean;
+  inPlaylist: boolean;
+}
+
 interface NewsState {
   newsItems: NewsItem[];
   interests: UserInterest[];
@@ -88,8 +94,8 @@ export const useNewsStore = create<NewsState>((set, get) => ({
         // Use user's selected interests
         categories = user.interests;
       } else {
-      // Use default categories for non-authenticated users or users without interests
-      categories = ['technology', 'world', 'business', 'science', 'crypto', 'ai'];
+        // Use default categories for non-authenticated users or users without interests
+        categories = ['technology', 'world', 'business', 'science', 'crypto', 'ai'];
       }
       
       console.log('Fetching news for categories:', categories);
@@ -123,6 +129,19 @@ export const useNewsStore = create<NewsState>((set, get) => ({
         const { fetchNewsForCategories } = await import('../lib/rss');
         newsItems = await fetchNewsForCategories(categories);
       }
+
+      // Fetch stored news items to get audio URLs
+      const storedNewsPromises = newsItems.map(async (item) => {
+        const urlHash = urlToHash(item.sourceUrl);
+        const { data: storedNews } = await getNewsByUrlHash(urlHash);
+        if (storedNews?.audio_url) {
+          item.audioUrl = storedNews.audio_url;
+        }
+        return item;
+      });
+
+      // Wait for all stored news fetches to complete
+      newsItems = await Promise.all(storedNewsPromises);
       
       set({ 
         newsItems, 
@@ -137,7 +156,7 @@ export const useNewsStore = create<NewsState>((set, get) => ({
         if (meta) {
           set(state => ({
             newsItems: state.newsItems.map(item => {
-              const metaItem = meta.find((m: any) => m.news_id === item.id);
+              const metaItem = meta.find((m: UserNewsMeta) => m.news_id === item.id);
               return metaItem ? { ...item, bookmarked: metaItem.bookmarked, inPlaylist: metaItem.inPlaylist } : item;
             })
           }));
@@ -226,14 +245,15 @@ export const useNewsStore = create<NewsState>((set, get) => ({
     try {
       const audioText = newsItem.tldr || newsItem.summary;
       const audioUrl = await generateAudio(audioText, user.isPremium, 'news');
-      // Minimal required fields for audio upsert (debugging 400 error)
+      // Minimal required fields for audio upsert
       const audioUpsertPayload = {
         url_hash: urlHash,
         source_url: newsItem.sourceUrl,
         title: newsItem.title,
         summary: newsItem.summary,
         category: newsItem.category,
-        audio_url: audioUrl
+        audio_url: audioUrl,
+        published_at: newsItem.publishedAt
       };
       console.log('Upserting audio to Supabase:', audioUpsertPayload);
       await upsertNewsByUrlHash(audioUpsertPayload);
@@ -297,14 +317,15 @@ export const useNewsStore = create<NewsState>((set, get) => ({
       // Use the existing summarizeUrl function from ai.ts with options
       const tldrSummary = await summarizeUrl(newsItem.sourceUrl, user.isPremium, options);
       console.log('[TLDR] LLM returned:', tldrSummary);
-      // Minimal required fields for TLDR upsert (debugging 400 error)
+      // Minimal required fields for TLDR upsert
       const tldrUpsertPayload = {
         url_hash: urlHash,
         source_url: newsItem.sourceUrl,
         title: newsItem.title,
-        summary: newsItem.summary, // short blurb
-        tldr: tldrSummary,         // long AI TLDR
-        category: newsItem.category
+        summary: newsItem.summary,
+        tldr: tldrSummary,
+        category: newsItem.category,
+        published_at: newsItem.publishedAt
       };
       console.log('Upserting TLDR to Supabase:', tldrUpsertPayload);
       const upsertResult = await upsertNewsByUrlHash(tldrUpsertPayload);
