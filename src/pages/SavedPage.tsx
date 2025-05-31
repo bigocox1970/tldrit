@@ -5,7 +5,7 @@ import { useAuthStore } from '../store/authStore';
 import Card, { CardContent } from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import ReactMarkdown from 'react-markdown';
-import { Volume2, Copy, Check, CheckSquare, Square } from 'lucide-react';
+import { Volume2, Copy, Check, CheckSquare, Square, ChevronDown } from 'lucide-react';
 import { Summary } from '../types';
 import { getExampleSummaries } from '../lib/supabase';
 
@@ -176,16 +176,45 @@ const SavedPage: React.FC = () => {
           {exampleSummaries.map((summary) => (
             <Card 
               key={summary.id}
-              onClick={() => setSelectedSummary(summary.id)}
+              onClick={() => setSelectedSummary(summary.id === selectedSummary ? null : summary.id)}
               className="cursor-pointer hover:border-blue-300 border border-gray-200 dark:border-gray-700 transition-all"
             >
               <CardContent>
-                <h3 className="font-medium text-lg mb-2 line-clamp-1">
-                  {summary.title}
-                </h3>
-                <p className="text-gray-600 dark:text-gray-400 line-clamp-2">
-                  {summary.summary}
-                </p>
+                <div className="flex justify-between items-start">
+                  <h3 className="font-medium text-lg mb-2 line-clamp-1">
+                    {summary.title}
+                  </h3>
+                  <button
+                    className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedSummary(summary.id === selectedSummary ? null : summary.id);
+                    }}
+                  >
+                    <ChevronDown 
+                      size={20} 
+                      className={`text-gray-500 dark:text-gray-400 transition-transform ${selectedSummary === summary.id ? 'rotate-180' : ''}`} 
+                    />
+                  </button>
+                </div>
+
+                {selectedSummary === summary.id ? (
+                  <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <div className="prose prose-blue max-w-none dark:prose-invert">
+                      <ReactMarkdown>
+                        {summary.summary
+                          .split('\n')
+                          .filter(line => !/^#+ /.test(line.trim()))
+                          .join('\n')}
+                      </ReactMarkdown>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-gray-600 dark:text-gray-400 line-clamp-2">
+                    {summary.summary}
+                  </p>
+                )}
+
                 <div className="flex justify-between items-center mt-4 text-sm text-gray-500 dark:text-gray-400">
                   <span>
                     {new Date(summary.createdAt).toLocaleDateString()}

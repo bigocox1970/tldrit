@@ -43,7 +43,7 @@ const ListenPage: React.FC = () => {
           {exampleSummaries.map((summary) => (
             <Card 
               key={summary.id}
-              className="cursor-pointer hover:border-blue-300 border border-gray-200 dark:border-gray-700 transition-all"
+              className="border border-gray-200 dark:border-gray-700"
             >
               <CardContent>
                 <h3 className="font-medium text-lg mb-4">
@@ -77,7 +77,6 @@ const ListenPage: React.FC = () => {
   if (isLoading) {
     return (
       <div>
-        {/* <h1 className="text-2xl font-bold mb-6">Listen</h1> */}
         <p>Loading audio summaries...</p>
       </div>
     );
@@ -86,8 +85,6 @@ const ListenPage: React.FC = () => {
   if (audioSummaries.length === 0) {
     return (
       <div>
-        {/* <h1 className="text-2xl font-bold mb-6">Listen</h1> */}
-        
         <Card>
           <CardContent className="text-center py-8">
             <h3 className="text-lg font-medium mb-4">
@@ -112,8 +109,6 @@ const ListenPage: React.FC = () => {
   
   return (
     <div>
-      {/* <h1 className="text-2xl font-bold mb-6">Listen</h1> */}
-      
       <div className="space-y-4">
         {audioSummaries.map((summary) => (
           <Card key={summary.id} className="border border-gray-200 dark:border-gray-700">

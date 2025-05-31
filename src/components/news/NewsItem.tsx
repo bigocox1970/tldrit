@@ -1,17 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { Volume2, Bookmark, BookmarkCheck, FileText, Copy, Headphones, ChevronDown } from 'lucide-react';
+import { Volume2, Bookmark, BookmarkCheck, FileText, Copy, Headphones, ChevronDown, X } from 'lucide-react';
 import { NewsItem as NewsItemType } from '../../types';
 import Card, { CardContent } from '../ui/Card';
 import { useNewsStore } from '../../store/newsStore';
 import ReactMarkdown from 'react-markdown';
 import { useAuthStore } from '../../store/authStore';
+import { Link } from 'react-router-dom';
+import Button from '../ui/Button';
 
 interface NewsItemProps {
   item: NewsItemType;
-  onTLDRClick?: () => void;
 }
 
-const NewsItem: React.FC<NewsItemProps> = ({ item, onTLDRClick }) => {
+const NewsItem: React.FC<NewsItemProps> = ({ item }) => {
   const { generateAudioForNewsItem, tldrLoading, currentlyPlayingId, setCurrentlyPlaying, audioRefs } = useNewsStore();
   const { user } = useAuthStore();
   const localStorageKey = `tldr-open-${item.id}`;
@@ -21,11 +22,7 @@ const NewsItem: React.FC<NewsItemProps> = ({ item, onTLDRClick }) => {
     }
     return false;
   });
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(localStorageKey, showTLDR ? 'true' : 'false');
-    }
-  }, [showTLDR, localStorageKey]);
+  const [showLoginDialog, setShowLoginDialog] = useState(false);
   const [copied, setCopied] = useState(false);
   const [audioLoading, setAudioLoading] = useState<{ [id: string]: boolean }>({});
   
@@ -286,7 +283,7 @@ const NewsItem: React.FC<NewsItemProps> = ({ item, onTLDRClick }) => {
                 onClick={(e) => {
                   e.stopPropagation();
                   if (!user) {
-                    if (onTLDRClick) onTLDRClick();
+                    setShowLoginDialog(true);
                     return;
                   }
                   if (!showTLDR) setShowTLDR(true);
@@ -294,9 +291,8 @@ const NewsItem: React.FC<NewsItemProps> = ({ item, onTLDRClick }) => {
                     useNewsStore.getState().generateTLDRForNewsItem(item.id);
                   }
                 }}
-                disabled={tldrLoading[item.id] || !user}
-                className={`flex items-center space-x-1 px-3 py-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${tldrLoading[item.id] || !user ? 'opacity-50 cursor-not-allowed' : ''}`}
-                title={!user ? "Sign in or create a FREE account to use the TLDR feature" : tldrText ? "Toggle TLDR" : "Generate TLDR"}
+                disabled={tldrLoading[item.id]}
+                className={`flex items-center space-x-1 px-3 py-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${tldrLoading[item.id] ? 'opacity-50' : ''}`}
               >
                 {tldrLoading[item.id] ? (
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
@@ -319,6 +315,38 @@ const NewsItem: React.FC<NewsItemProps> = ({ item, onTLDRClick }) => {
               Read Full Article →
             </button>
           </div>
+
+          {/* Login Dialog */}
+          {showLoginDialog && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 max-w-md w-full mx-4">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-semibold">Sign in Required</h3>
+                  <button
+                    onClick={() => setShowLoginDialog(false)}
+                    className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+                <p className="text-gray-600 dark:text-gray-300 mb-6">
+                  Please sign in or create a FREE account to access the TLDR feature.
+                </p>
+                <div className="flex space-x-4">
+                  <Link to="/login" className="flex-1">
+                    <Button variant="primary" fullWidth onClick={() => setShowLoginDialog(false)}>
+                      Sign In
+                    </Button>
+                  </Link>
+                  <Link to="/register" className="flex-1">
+                    <Button variant="outline" fullWidth onClick={() => setShowLoginDialog(false)}>
+                      Create Account
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
