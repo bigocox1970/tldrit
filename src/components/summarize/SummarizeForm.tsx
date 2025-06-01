@@ -14,9 +14,15 @@ import UpgradeModal from '../ui/UpgradeModal';
 
 interface SummarizeFormProps {
   initialContent?: string;
+  autoStart?: boolean;
+  fileType?: boolean;
 }
 
-const SummarizeForm: React.FC<SummarizeFormProps> = ({ initialContent = '' }) => {
+const SummarizeForm: React.FC<SummarizeFormProps> = ({ 
+  initialContent = '', 
+  autoStart = false,
+  fileType = false
+}) => {
   const { createSummary, currentSummary, isLoading, summaries, generateAudioForSummary } = useSummaryStore();
   const { isAuthenticated, user } = useAuthStore();
   const { currentlyPlaying, isPlaying, toggleAudio } = useAudioStore();
@@ -71,6 +77,87 @@ const SummarizeForm: React.FC<SummarizeFormProps> = ({ initialContent = '' }) =>
       }
     }
   }, []);
+
+  // Set input type based on fileType prop
+  useEffect(() => {
+    if (fileType) {
+      setInputType('file');
+    }
+  }, [fileType]);
+
+  // Track if we've already auto-started
+  const [hasAutoStarted, setHasAutoStarted] = useState(false);
+
+  // Auto-start summary generation if requested (only once)
+  useEffect(() => {
+    if (autoStart && isAuthenticated && !isLoading && !hasAutoStarted) {
+      // Small delay to ensure the component is fully mounted
+      const timer = setTimeout(() => {
+        if ((inputType === 'text' && content) || 
+            (inputType === 'file' && file) || 
+            (inputType === 'url' && content)) {
+          // Create a function to auto-submit without needing an event
+          autoSubmit();
+          setHasAutoStarted(true);
+          
+          // Remove autoStart from URL to prevent re-triggering
+          const url = new URL(window.location.href);
+          url.searchParams.delete('autoStart');
+          window.history.replaceState({}, '', url.toString());
+        }
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [autoStart, isAuthenticated, content, file, inputType, isLoading, hasAutoStarted]);
+
+  // Function to handle auto-submission without an event
+  const autoSubmit = async () => {
+    setError('');
+    
+    if (!isAuthenticated) {
+      setError('You must be signed in to create summaries');
+      return;
+    }
+    
+    // Clear the current summary before starting a new one
+    useSummaryStore.setState({ currentSummary: null });
+    setShowOverlay(true);
+    
+    try {
+      if (inputType === 'text' && !content.trim()) {
+        setError('Please enter some text to summarize');
+        return;
+      }
+      
+      if (inputType === 'url' && !content.trim()) {
+        setError('Please enter a URL to summarize');
+        return;
+      }
+      
+      if (inputType === 'file' && !file) {
+        setError('Please upload a file to summarize');
+        return;
+      }
+      
+      if (!user?.isPremium) {
+        const wordCount = content.split(/\s+/).length;
+        if (wordCount > 1000) {
+          setError('Free accounts are limited to 1000 words. Upgrade to summarize longer content.');
+          return;
+        }
+      }
+      
+      await createSummary({
+        content: inputType === 'file' ? file! : content,
+        contentType: inputType,
+        summaryLevel,
+        isEli5,
+      });
+    } catch {
+      setError('An error occurred while creating the summary');
+    }
+  };
 
   useEffect(() => {
     if (textareaRef.current) {

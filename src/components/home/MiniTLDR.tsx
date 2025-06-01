@@ -86,9 +86,9 @@ const MiniTLDR: React.FC = () => {
       // Store the actual file in a global variable
       window.__tldrTempFile = file;
 
-      navigate('/summarize?type=file');
+      navigate('/summarize?type=file&autoStart=true');
     } else if (content) {
-      navigate(`/summarize?content=${encodeURIComponent(content)}`);
+      navigate(`/summarize?content=${encodeURIComponent(content)}&autoStart=true`);
     } else {
       navigate('/summarize');
     }
@@ -154,4 +154,4 @@ declare global {
   }
 }
 
-export default MiniTLDR; 
+export default MiniTLDR;
