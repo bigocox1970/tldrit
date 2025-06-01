@@ -39,7 +39,6 @@ const SavedPage: React.FC = () => {
     isEditMode,
     togglePlaylist
   } = useSummaryStore();
-  const { generateAudioForNewsItem } = useNewsStore();
   const { 
     selectedSavedNewsItems,
     setSelectedSavedNewsItems,
@@ -235,12 +234,45 @@ const SavedPage: React.FC = () => {
       // Use global audio store to handle playback
       toggleAudio(newsItem.id, newsItem.audioUrl);
     } else {
-      // Generate audio for news item
+      // Generate audio for news item - call TTS API directly since this is a saved/bookmarked item
       setNewsAudioLoading(prev => ({ ...prev, [newsItem.id]: true }));
       try {
-        await generateAudioForNewsItem(newsItem.id);
-        // Refetch to get updated audio URL
-        await fetchBookmarkedNews();
+        // Import generateAudio function directly to bypass store ID mismatch
+        const { generateAudio } = await import('../lib/ai');
+        const audioText = newsItem.tldr || newsItem.summary;
+        const audioUrl = await generateAudio(
+          audioText, 
+          user?.isPremium || false, 
+          'news', 
+          newsItem.title,
+          newsItem.sourceUrl
+        );
+        
+        // Update the audio URL in the database
+        const { upsertNewsByUrlHash } = await import('../lib/supabase');
+        const { urlToHash } = await import('../lib/hash');
+        const urlHash = urlToHash(newsItem.sourceUrl);
+        await upsertNewsByUrlHash({
+          url_hash: urlHash,
+          source_url: newsItem.sourceUrl,
+          title: newsItem.title,
+          summary: newsItem.summary,
+          category: newsItem.category,
+          audio_url: audioUrl,
+          published_at: newsItem.publishedAt
+        });
+        
+        // Update local state
+        setBookmarkedNews(prev => 
+          prev.map(item => 
+            item.id === newsItem.id 
+              ? { ...item, audioUrl }
+              : item
+          )
+        );
+        
+        // Auto-play the generated audio
+        toggleAudio(newsItem.id, audioUrl);
       } catch (err: unknown) {
         let message = 'Failed to generate audio.';
         if (err instanceof Error) message = err.message;
