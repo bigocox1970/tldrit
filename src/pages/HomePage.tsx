@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import HeroSection from '../components/home/HeroSection';
 import FeatureSection from '../components/home/FeatureSection';
+import MiniTLDR from '../components/home/MiniTLDR';
 import { Smartphone, BookOpen, Lightbulb, GraduationCap, FileText, User } from 'lucide-react';
 // import RecentSummaries from '../components/home/RecentSummaries';
 // import NewsCarousel from '../components/news/NewsCarousel';
@@ -80,6 +81,7 @@ const HomePage: React.FC = () => {
   return (
     <div>
       <HeroSection />
+      <MiniTLDR />
       <FeatureSection />
       {/* Removed NewsCarousel and RecentSummaries */}
       {/* Ad Banner for ELI5.app with 3D flip animation */}

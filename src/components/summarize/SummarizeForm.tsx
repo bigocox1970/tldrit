@@ -12,13 +12,17 @@ import Card, { CardContent } from '../ui/Card';
 import ReactMarkdown from 'react-markdown';
 import UpgradeModal from '../ui/UpgradeModal';
 
-const SummarizeForm: React.FC = () => {
+interface SummarizeFormProps {
+  initialContent?: string;
+}
+
+const SummarizeForm: React.FC<SummarizeFormProps> = ({ initialContent = '' }) => {
   const { createSummary, currentSummary, isLoading, summaries, generateAudioForSummary } = useSummaryStore();
   const { isAuthenticated, user } = useAuthStore();
   const { currentlyPlaying, isPlaying, toggleAudio } = useAudioStore();
   
   const [inputType, setInputType] = useState<'text' | 'url' | 'file'>('text');
-  const [content, setContent] = useState('');
+  const [content, setContent] = useState(initialContent);
   const [file, setFile] = useState<File | null>(null);
   const [isEli5, setIsEli5] = useState(false);
   const [summaryLevel, setSummaryLevel] = useState(2);
@@ -38,6 +42,35 @@ const SummarizeForm: React.FC = () => {
   const eli5Age = user?.eli5Age ?? 5;
   const eli5Label = isEli5 ? `ELI${eli5Age}` : 'ELI5';
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Load file from sessionStorage if present
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const type = searchParams.get('type');
+    
+    if (type === 'file') {
+      const storedFileData = sessionStorage.getItem('tldrTempFormData');
+      const tempFile = window.__tldrTempFile;
+      
+      if (storedFileData && tempFile) {
+        try {
+          const fileData = JSON.parse(storedFileData);
+          // Verify the file matches the stored data
+          if (fileData.name === tempFile.name && 
+              fileData.size === tempFile.size && 
+              fileData.lastModified === tempFile.lastModified) {
+            setFile(tempFile);
+            setInputType('file');
+          }
+          // Clean up
+          sessionStorage.removeItem('tldrTempFormData');
+          delete window.__tldrTempFile;
+        } catch (error) {
+          console.error('Error loading file from storage:', error);
+        }
+      }
+    }
+  }, []);
 
   useEffect(() => {
     if (textareaRef.current) {
