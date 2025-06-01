@@ -87,10 +87,10 @@ export const useNewsStore = create<NewsState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       // For saved page items, we need to work directly with database IDs
-      // Instead of using toggleBookmark, directly update the user_news_meta table
+      // When deleting from saved, also remove from playlist since listen page should only show saved items
       await Promise.all(itemIds.map(async (id) => {
-        console.log('[News Store] Setting bookmarked=false for database ID:', id);
-        return upsertUserNewsMeta(user.id, id, { bookmarked: false });
+        console.log('[News Store] Setting bookmarked=false and in_playlist=false for database ID:', id);
+        return upsertUserNewsMeta(user.id, id, { bookmarked: false, in_playlist: false });
       }));
       
       console.log('[News Store] deleteSelectedNewsItems completed successfully');

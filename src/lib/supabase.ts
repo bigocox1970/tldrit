@@ -347,7 +347,7 @@ export async function getExampleSummaries(): Promise<{ data: Summary[] | null; e
   }
 }
 
-// Get playlist news items for a user (news items with inPlaylist: true)
+// Get playlist news items for a user (news items with inPlaylist: true AND bookmarked: true)
 export async function getPlaylistNewsItems(userId: string) {
   const { data, error } = await supabase
     .from('user_news_meta')
@@ -370,6 +370,7 @@ export async function getPlaylistNewsItems(userId: string) {
     `)
     .eq('user_id', userId)
     .eq('in_playlist', true)
+    .eq('bookmarked', true)
     .order('created_at', { ascending: false });
   
   return { data, error };
