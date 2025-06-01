@@ -330,7 +330,12 @@ export const useNewsStore = create<NewsState>((set, get) => ({
 
     try {
       const audioText = newsItem.tldr || newsItem.summary;
-      const audioUrl = await generateAudio(audioText, user.isPremium, 'news');
+      const audioUrl = await generateAudio(
+        audioText, 
+        user.isPremium, 
+        'news', 
+        newsItem.title
+      );
       // Minimal required fields for audio upsert
       const audioUpsertPayload = {
         url_hash: urlHash,

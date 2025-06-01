@@ -4,18 +4,25 @@ interface AudioState {
   currentlyPlaying: string | null; // ID of currently playing audio
   audioInstance: HTMLAudioElement | null;
   isPlaying: boolean;
+  onTrackEnd: (() => void) | null; // Callback for when track ends
   
   // Actions
   playAudio: (id: string, audioUrl: string) => void;
   pauseAudio: () => void;
   stopAudio: () => void;
   toggleAudio: (id: string, audioUrl: string) => void;
+  setOnTrackEnd: (callback: (() => void) | null) => void;
 }
 
 export const useAudioStore = create<AudioState>((set, get) => ({
   currentlyPlaying: null,
   audioInstance: null,
   isPlaying: false,
+  onTrackEnd: null,
+
+  setOnTrackEnd: (callback: (() => void) | null) => {
+    set({ onTrackEnd: callback });
+  },
 
   playAudio: (id: string, audioUrl: string) => {
     const state = get();
@@ -31,7 +38,12 @@ export const useAudioStore = create<AudioState>((set, get) => ({
     
     // Set up event listeners
     audio.addEventListener('ended', () => {
-      set({ currentlyPlaying: null, audioInstance: null, isPlaying: false });
+      const currentState = get();
+      if (currentState.onTrackEnd) {
+        currentState.onTrackEnd();
+      } else {
+        set({ currentlyPlaying: null, audioInstance: null, isPlaying: false });
+      }
     });
 
     audio.addEventListener('error', () => {

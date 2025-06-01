@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSummaryStore } from '../store/summaryStore';
 import { useAuthStore } from '../store/authStore';
@@ -6,9 +6,26 @@ import { useAudioStore } from '../store/audioStore';
 import { useNewsStore } from '../store/newsStore';
 import Card, { CardContent } from '../components/ui/Card';
 import Button from '../components/ui/Button';
+import StickyMediaPlayer from '../components/StickyMediaPlayer';
+import DraggablePlaylistItem from '../components/DraggablePlaylistItem';
 import { getExampleSummaries, getPlaylistNewsItems } from '../lib/supabase';
 import { Summary } from '../types';
-import { FileText, Headphones, Newspaper, Play, Pause, CheckSquare, Square } from 'lucide-react';
+import { Headphones, CheckSquare, Square, Play } from 'lucide-react';
+import {
+  DndContext,
+  DragEndEvent,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
 
 interface PlaylistNewsItem {
   id: string;
@@ -22,6 +39,19 @@ interface PlaylistNewsItem {
   imageUrl?: string;
 }
 
+interface PlaylistItem {
+  id: string;
+  title: string;
+  audioUrl?: string;
+  type: 'summary' | 'news';
+  category?: string;
+  createdAt?: string;
+  publishedAt?: string;
+  isEli5?: boolean;
+  summaryLevel?: number;
+  sourceUrl?: string;
+}
+
 const ListenPage: React.FC = () => {
   const navigate = useNavigate();
   const { isAuthenticated, user } = useAuthStore();
@@ -33,15 +63,12 @@ const ListenPage: React.FC = () => {
     setSelectedListenItems,
     isListenEditMode
   } = useSummaryStore();
-  const { currentlyPlaying, isPlaying, toggleAudio } = useAudioStore();
+  const { currentlyPlaying, toggleAudio, setOnTrackEnd } = useAudioStore();
   const { 
     selectedListenNewsItems,
     setSelectedListenNewsItems,
     isListenNewsEditMode
   } = useNewsStore();
-  
-  // Tab state
-  const [activeTab, setActiveTab] = useState<'summaries' | 'news'>('summaries');
   
   // Regular summaries state
   const [exampleSummaries, setExampleSummaries] = useState<Summary[]>([]);
@@ -50,6 +77,20 @@ const ListenPage: React.FC = () => {
   // Playlist news state
   const [playlistNews, setPlaylistNews] = useState<PlaylistNewsItem[]>([]);
   const [newsLoading, setNewsLoading] = useState(false);
+
+  // Playlist order state
+  const [playlistOrder, setPlaylistOrder] = useState<string[]>([]);
+
+  // Play all mode state
+  const [isPlayAllMode, setIsPlayAllMode] = useState(false);
+
+  // Drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   // Fetch playlist news items
   const fetchPlaylistNews = async () => {
@@ -126,107 +167,248 @@ const ListenPage: React.FC = () => {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [isAuthenticated, fetchSummaries]);
 
-  const audioSummaries = summaries.filter(s => s.inPlaylist);
-  
-  // Handle item selection for summaries
-  const handleSummaryClick = (summaryId: string) => {
-    if (isListenEditMode) {
-      // In edit mode - handle selection
-      if (selectedListenItems.includes(summaryId)) {
-        setSelectedListenItems(selectedListenItems.filter(id => id !== summaryId));
-      } else {
-        setSelectedListenItems([...selectedListenItems, summaryId]);
-      }
+  // Create unified playlist
+  const unifiedPlaylist = useMemo(() => {
+    const audioSummaries = summaries.filter(s => s.inPlaylist);
+    
+    const summaryItems: PlaylistItem[] = audioSummaries.map(summary => ({
+      id: summary.id,
+      title: summary.title,
+      audioUrl: summary.audioUrl,
+      type: 'summary' as const,
+      createdAt: summary.createdAt,
+      isEli5: summary.isEli5,
+      summaryLevel: summary.summaryLevel,
+    }));
+
+    const newsItems: PlaylistItem[] = playlistNews.map(news => ({
+      id: news.id,
+      title: news.title,
+      audioUrl: news.audioUrl,
+      type: 'news' as const,
+      category: news.category,
+      publishedAt: news.publishedAt,
+      sourceUrl: news.sourceUrl,
+    }));
+
+    const allItems = [...summaryItems, ...newsItems];
+    
+    // Apply saved order if available, otherwise use default order
+    if (playlistOrder.length > 0) {
+      const orderedItems = playlistOrder
+        .map(id => allItems.find(item => item.id === id))
+        .filter(Boolean) as PlaylistItem[];
+      
+      // Add any new items that aren't in the saved order
+      const newItems = allItems.filter(item => !playlistOrder.includes(item.id));
+      return [...orderedItems, ...newItems];
     }
-    // Note: We don't expand/collapse summaries on listen page like saved page
+    
+    return allItems;
+  }, [summaries, playlistNews, playlistOrder]);
+
+  // Update playlist order when items change
+  useEffect(() => {
+    if (playlistOrder.length === 0 && unifiedPlaylist.length > 0) {
+      setPlaylistOrder(unifiedPlaylist.map(item => item.id));
+    }
+  }, [unifiedPlaylist, playlistOrder.length]);
+
+  // Handle drag end
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (active.id !== over?.id) {
+      const oldIndex = unifiedPlaylist.findIndex(item => item.id === active.id);
+      const newIndex = unifiedPlaylist.findIndex(item => item.id === over?.id);
+      
+      const newOrder = arrayMove(unifiedPlaylist, oldIndex, newIndex);
+      setPlaylistOrder(newOrder.map(item => item.id));
+    }
   };
 
-  // Handle item selection for news items
-  const handleNewsClick = (newsId: string) => {
-    if (isListenNewsEditMode) {
-      // In edit mode - handle selection
-      if (selectedListenNewsItems.includes(newsId)) {
-        setSelectedListenNewsItems(selectedListenNewsItems.filter(id => id !== newsId));
-      } else {
-        setSelectedListenNewsItems([...selectedListenNewsItems, newsId]);
+  // Get current playing index
+  const currentIndex = useMemo(() => {
+    return unifiedPlaylist.findIndex(item => item.id === currentlyPlaying);
+  }, [unifiedPlaylist, currentlyPlaying]);
+
+  // Handle next/previous
+  const handleNext = () => {
+    if (currentIndex < unifiedPlaylist.length - 1) {
+      const nextItem = unifiedPlaylist[currentIndex + 1];
+      if (nextItem.audioUrl) {
+        toggleAudio(nextItem.id, nextItem.audioUrl);
       }
     }
-    // Note: We don't expand/collapse news items on listen page
   };
 
-  // Handle select all for current tab
-  const handleSelectAll = () => {
-    if (activeTab === 'summaries') {
-      if (selectedListenItems.length === audioSummaries.length) {
-        // If all are selected, deselect all
-        setSelectedListenItems([]);
+  const handlePrevious = () => {
+    if (currentIndex > 0) {
+      const prevItem = unifiedPlaylist[currentIndex - 1];
+      if (prevItem.audioUrl) {
+        toggleAudio(prevItem.id, prevItem.audioUrl);
+      }
+    }
+  };
+
+  // Handle play all - starts from first item with audio or from currently selected item
+  const handlePlayAll = () => {
+    const itemsWithAudio = unifiedPlaylist.filter(item => item.audioUrl);
+    if (itemsWithAudio.length === 0) return;
+
+    // If already in play all mode, turn it off and stop audio
+    if (isPlayAllMode) {
+      setIsPlayAllMode(false);
+      setOnTrackEnd(null);
+      // Stop the currently playing audio
+      if (currentlyPlaying) {
+        // Toggle the current audio to stop it
+        const currentItem = unifiedPlaylist.find(item => item.id === currentlyPlaying);
+        if (currentItem?.audioUrl) {
+          toggleAudio(currentItem.id, currentItem.audioUrl);
+        }
+      }
+      return;
+    }
+
+    setIsPlayAllMode(true);
+
+    // If something is already playing, continue from there
+    if (currentlyPlaying && currentIndex >= 0) {
+      const currentItem = unifiedPlaylist[currentIndex];
+      if (currentItem?.audioUrl) {
+        toggleAudio(currentItem.id, currentItem.audioUrl);
+        return;
+      }
+    }
+
+    // Otherwise start from the first item with audio
+    const firstItemWithAudio = itemsWithAudio[0];
+    toggleAudio(firstItemWithAudio.id, firstItemWithAudio.audioUrl!);
+  };
+
+  // Handle jumping to a specific track (when not in edit mode)
+  const handleTrackJump = (itemId: string) => {
+    const item = unifiedPlaylist.find(i => i.id === itemId);
+    if (!item?.audioUrl) return;
+
+    // If we're in play all mode, continue from this track
+    // If not in play all mode, just play this single track
+    toggleAudio(item.id, item.audioUrl);
+    
+    // Keep play all mode active if it was already active
+    // This ensures auto-advance continues from the new position
+  };
+
+  // Set up auto-advance when track ends
+  useEffect(() => {
+    if (isPlayAllMode) {
+      setOnTrackEnd(() => {
+        // Auto-advance to next track with audio
+        if (currentIndex < unifiedPlaylist.length - 1) {
+          let nextIndex = currentIndex + 1;
+          while (nextIndex < unifiedPlaylist.length) {
+            const nextItem = unifiedPlaylist[nextIndex];
+            if (nextItem.audioUrl) {
+              toggleAudio(nextItem.id, nextItem.audioUrl);
+              return;
+            }
+            nextIndex++;
+          }
+        }
+        // If no next track found, exit play all mode
+        setIsPlayAllMode(false);
+        setOnTrackEnd(null);
+      });
+    } else {
+      setOnTrackEnd(null);
+    }
+
+    return () => {
+      setOnTrackEnd(null);
+    };
+  }, [currentIndex, unifiedPlaylist, toggleAudio, setOnTrackEnd, isPlayAllMode]);
+
+  // Clear play all mode when audio is manually stopped/paused
+  useEffect(() => {
+    if (!currentlyPlaying) {
+      setIsPlayAllMode(false);
+    }
+  }, [currentlyPlaying]);
+
+  // Handle item selection
+  const handleItemSelect = (itemId: string) => {
+    const item = unifiedPlaylist.find(i => i.id === itemId);
+    if (!item) return;
+
+    if (item.type === 'summary') {
+      if (selectedListenItems.includes(itemId)) {
+        setSelectedListenItems(selectedListenItems.filter(id => id !== itemId));
       } else {
-        // Otherwise, select all
-        setSelectedListenItems(audioSummaries.map(s => s.id));
+        setSelectedListenItems([...selectedListenItems, itemId]);
       }
     } else {
-      if (selectedListenNewsItems.length === playlistNews.length) {
-        // If all are selected, deselect all
-        setSelectedListenNewsItems([]);
+      if (selectedListenNewsItems.includes(itemId)) {
+        setSelectedListenNewsItems(selectedListenNewsItems.filter(id => id !== itemId));
       } else {
-        // Otherwise, select all
-        setSelectedListenNewsItems(playlistNews.map(n => n.id));
+        setSelectedListenNewsItems([...selectedListenNewsItems, itemId]);
       }
     }
   };
+
+  // Handle select all
+  const handleSelectAll = () => {
+    const summaryIds = unifiedPlaylist.filter(item => item.type === 'summary').map(item => item.id);
+    const newsIds = unifiedPlaylist.filter(item => item.type === 'news').map(item => item.id);
+    
+    const allSummariesSelected = summaryIds.every(id => selectedListenItems.includes(id));
+    const allNewsSelected = newsIds.every(id => selectedListenNewsItems.includes(id));
+    
+    if (allSummariesSelected && allNewsSelected) {
+      // Deselect all
+      setSelectedListenItems([]);
+      setSelectedListenNewsItems([]);
+    } else {
+      // Select all
+      setSelectedListenItems(summaryIds);
+      setSelectedListenNewsItems(newsIds);
+    }
+  };
+
+  // Check if all items are selected
+  const allItemsSelected = useMemo(() => {
+    const summaryIds = unifiedPlaylist.filter(item => item.type === 'summary').map(item => item.id);
+    const newsIds = unifiedPlaylist.filter(item => item.type === 'news').map(item => item.id);
+    
+    return summaryIds.every(id => selectedListenItems.includes(id)) &&
+           newsIds.every(id => selectedListenNewsItems.includes(id)) &&
+           summaryIds.length > 0 && newsIds.length > 0;
+  }, [unifiedPlaylist, selectedListenItems, selectedListenNewsItems]);
 
   if (!isAuthenticated) {
     if (exampleLoading) {
-      return <div>Loading example TLDRs...</div>;
+      return <div className="pb-32 md:pb-20">Loading example TLDRs...</div>;
     }
 
     return (
-      <div>
-        <div className="space-y-4">
+      <div className="pb-32 md:pb-20">
+        <div className="space-y-3">
           {exampleSummaries.map((summary) => (
-            <Card 
+            <DraggablePlaylistItem
               key={summary.id}
-              className="border border-gray-200 dark:border-gray-700"
-            >
-              <CardContent>
-                <h3 className="font-medium text-lg mb-4">
-                  {summary.title}
-                </h3>
-                
-                <div className="mb-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-                  <div className="flex items-center gap-4">
-                    <button
-                      onClick={() => toggleAudio(summary.id, summary.audioUrl!)}
-                      className="p-3 rounded-full bg-blue-500 hover:bg-blue-600 text-white transition-colors"
-                      title={currentlyPlaying === summary.id && isPlaying ? 'Pause' : 'Play'}
-                    >
-                      {currentlyPlaying === summary.id && isPlaying ? (
-                        <Pause size={24} />
-                      ) : (
-                        <Play size={24} />
-                      )}
-                    </button>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                        {currentlyPlaying === summary.id && isPlaying ? 'Now Playing' : 'Ready to Play'}
-                      </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        Click to {currentlyPlaying === summary.id && isPlaying ? 'pause' : 'play'} audio
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="flex justify-between items-center text-sm text-gray-500 dark:text-gray-400">
-                  <span>
-                    {new Date(summary.createdAt).toLocaleDateString()}
-                  </span>
-                  <span>
-                    {summary.isEli5 ? 'ELI5' : `Level ${summary.summaryLevel}`}
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
+              item={{
+                id: summary.id,
+                title: summary.title,
+                audioUrl: summary.audioUrl,
+                type: 'summary',
+                createdAt: summary.createdAt,
+                isEli5: summary.isEli5,
+                summaryLevel: summary.summaryLevel,
+              }}
+              isSelected={false}
+              isEditMode={false}
+              onSelect={() => {}}
+            />
           ))}
         </div>
       </div>
@@ -235,15 +417,15 @@ const ListenPage: React.FC = () => {
   
   if (isLoading && newsLoading) {
     return (
-      <div>
+      <div className="pb-32 md:pb-20">
         <p>Loading audio content...</p>
       </div>
     );
   }
   
-  if (audioSummaries.length === 0 && playlistNews.length === 0) {
+  if (unifiedPlaylist.length === 0) {
     return (
-      <div>
+      <div className="pb-32 md:pb-20">
         <Card>
           <CardContent className="text-center py-8">
             <Headphones size={48} className="mx-auto text-gray-400 mb-4" />
@@ -274,35 +456,33 @@ const ListenPage: React.FC = () => {
   }
 
   return (
-    <div>
-      {/* Simple tabs */}
-      <div className="flex space-x-1 mb-6 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
-        <button
-          onClick={() => setActiveTab('summaries')}
-          className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-            activeTab === 'summaries'
-              ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm'
-              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-          }`}
-        >
-          <div className="flex items-center justify-center gap-2">
-            <FileText size={16} />
-            <span>My TLDRs ({audioSummaries.length})</span>
-          </div>
-        </button>
-        <button
-          onClick={() => setActiveTab('news')}
-          className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-            activeTab === 'news'
-              ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm'
-              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-          }`}
-        >
-          <div className="flex items-center justify-center gap-2">
-            <Newspaper size={16} />
-            <span>News TLDRs ({playlistNews.length})</span>
-          </div>
-        </button>
+    <div className="pb-32 md:pb-20">
+      {/* Header with item count */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+            Your Playlist
+          </h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            {unifiedPlaylist.length} items
+          </p>
+        </div>
+        
+        {/* Play All Button */}
+        {unifiedPlaylist.filter(item => item.audioUrl).length > 0 && (
+          <Button
+            variant={isPlayAllMode ? "secondary" : "primary"}
+            onClick={handlePlayAll}
+            className={`flex items-center gap-2 ${
+              isPlayAllMode 
+                ? 'bg-gradient-to-r from-orange-500 to-yellow-500 hover:from-orange-600 hover:to-yellow-600 text-white ring-2 ring-orange-200' 
+                : ''
+            }`}
+          >
+            <Play size={16} />
+            {isPlayAllMode ? 'Playing All' : 'Play All'}
+          </Button>
+        )}
       </div>
 
       {/* Select All button - only show in edit mode */}
@@ -312,238 +492,65 @@ const ListenPage: React.FC = () => {
             onClick={handleSelectAll}
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
           >
-            {((activeTab === 'summaries' && selectedListenItems.length === audioSummaries.length) ||
-              (activeTab === 'news' && selectedListenNewsItems.length === playlistNews.length)) ? (
+            {allItemsSelected ? (
               <CheckSquare size={20} className="text-blue-500" />
             ) : (
               <Square size={20} />
             )}
-            {((activeTab === 'summaries' && selectedListenItems.length === audioSummaries.length) ||
-              (activeTab === 'news' && selectedListenNewsItems.length === playlistNews.length)) ? 'Deselect All' : 'Select All'}
+            {allItemsSelected ? 'Deselect All' : 'Select All'}
           </button>
         </div>
       )}
 
-      {/* Content based on active tab - SIMPLE MEDIA PLAYER FORMAT */}
-      <div className="space-y-4">
-        {activeTab === 'summaries' ? (
-          audioSummaries.length === 0 ? (
-            <Card>
-              <CardContent className="text-center py-8">
-                <h3 className="text-lg font-medium mb-4">
-                  No TLDRs in your playlist yet
-                </h3>
-                <p className="text-gray-600 dark:text-gray-400 mb-4">
-                  Click the headphones icon on your saved TLDRs to add them to your listening playlist
-                </p>
-                <Button 
-                  variant="primary"
-                  onClick={() => navigate('/saved')}
-                >
-                  View Saved TLDRs
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            audioSummaries.map((summary) => (
-              <Card 
-                key={summary.id} 
-                className={`border border-gray-200 dark:border-gray-700 cursor-pointer transition-colors ${
-                  isListenEditMode && selectedListenItems.includes(summary.id) 
-                    ? 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-900/20' 
-                    : ''
-                }`}
-                onClick={() => handleSummaryClick(summary.id)}
-              >
-                <CardContent>
-                  {isListenEditMode && (
-                    <div className="flex items-center mb-3">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleSummaryClick(summary.id);
-                        }}
-                        className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800"
-                      >
-                        {selectedListenItems.includes(summary.id) ? (
-                          <CheckSquare size={20} className="text-blue-500" />
-                        ) : (
-                          <Square size={20} className="text-gray-400" />
-                        )}
-                      </button>
-                    </div>
-                  )}
-                  
-                  <h3 className="font-medium text-lg mb-4">
-                    {summary.title}
-                  </h3>
-                  
-                  {summary.audioUrl ? (
-                    <div className="mb-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-                      <div className="flex items-center gap-4">
-                        <button
-                          onClick={() => toggleAudio(summary.id, summary.audioUrl!)}
-                          className="p-3 rounded-full bg-blue-500 hover:bg-blue-600 text-white transition-colors"
-                          title={currentlyPlaying === summary.id && isPlaying ? 'Pause' : 'Play'}
-                        >
-                          {currentlyPlaying === summary.id && isPlaying ? (
-                            <Pause size={24} />
-                          ) : (
-                            <Play size={24} />
-                          )}
-                        </button>
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                            {currentlyPlaying === summary.id && isPlaying ? 'Now Playing' : 'Ready to Play'}
-                          </p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            Click to {currentlyPlaying === summary.id && isPlaying ? 'pause' : 'play'} audio
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="mb-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-                      <p className="text-gray-600 dark:text-gray-400 text-sm mb-2">
-                        Audio not generated yet
-                      </p>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => navigate('/saved')}
-                      >
-                        Generate Audio on Saved Page
-                      </Button>
-                    </div>
-                  )}
-                  
-                  <div className="flex justify-between items-center text-sm text-gray-500 dark:text-gray-400">
-                    <span>
-                      {new Date(summary.createdAt).toLocaleDateString()}
-                    </span>
-                    <span>
-                      {summary.isEli5 ? 'ELI5' : `Level ${summary.summaryLevel}`}
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-          )
-        ) : (
-          playlistNews.length === 0 ? (
-            <Card>
-              <CardContent className="text-center py-8">
-                <Newspaper size={48} className="mx-auto text-gray-400 mb-4" />
-                <h3 className="text-lg font-medium mb-4">
-                  No news TLDRs in your playlist yet
-                </h3>
-                <p className="text-gray-600 dark:text-gray-400 mb-4">
-                  Click the headphones icon on news TLDR cards to add them to your playlist
-                </p>
-                <Button 
-                  variant="primary"
-                  onClick={() => navigate('/news')}
-                >
-                  Browse News
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            playlistNews.map((newsItem) => (
-              <Card 
-                key={newsItem.id} 
-                className={`border border-gray-200 dark:border-gray-700 cursor-pointer transition-colors ${
-                  isListenNewsEditMode && selectedListenNewsItems.includes(newsItem.id) 
-                    ? 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-900/20' 
-                    : ''
-                }`}
-                onClick={() => handleNewsClick(newsItem.id)}
-              >
-                <CardContent>
-                  {isListenNewsEditMode && (
-                    <div className="flex items-center mb-3">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleNewsClick(newsItem.id);
-                        }}
-                        className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800"
-                      >
-                        {selectedListenNewsItems.includes(newsItem.id) ? (
-                          <CheckSquare size={20} className="text-blue-500" />
-                        ) : (
-                          <Square size={20} className="text-gray-400" />
-                        )}
-                      </button>
-                    </div>
-                  )}
-                  
-                  <div className="flex justify-between items-start mb-2">
-                    <span className="text-sm font-medium px-2 py-1 rounded-full bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300">
-                      {newsItem.category}
-                    </span>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">
-                      {new Date(newsItem.publishedAt).toLocaleDateString()}
-                    </span>
-                  </div>
-                  
-                  <h3 className="font-medium text-lg mb-4">
-                    {newsItem.title}
-                  </h3>
-                  
-                  {newsItem.audioUrl ? (
-                    <div className="mb-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-                      <div className="flex items-center gap-4">
-                        <button
-                          onClick={() => toggleAudio(newsItem.id, newsItem.audioUrl!)}
-                          className="p-3 rounded-full bg-blue-500 hover:bg-blue-600 text-white transition-colors"
-                          title={currentlyPlaying === newsItem.id && isPlaying ? 'Pause' : 'Play'}
-                        >
-                          {currentlyPlaying === newsItem.id && isPlaying ? (
-                            <Pause size={24} />
-                          ) : (
-                            <Play size={24} />
-                          )}
-                        </button>
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                            {currentlyPlaying === newsItem.id && isPlaying ? 'Now Playing' : 'Ready to Play'}
-                          </p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            Click to {currentlyPlaying === newsItem.id && isPlaying ? 'pause' : 'play'} audio
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="mb-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-                      <p className="text-gray-600 dark:text-gray-400 text-sm mb-2">
-                        Audio not generated yet
-                      </p>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => navigate('/news')}
-                      >
-                        Generate Audio on News Page
-                      </Button>
-                    </div>
-                  )}
-                  
-                  <a
-                    href={newsItem.sourceUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 dark:text-blue-400 hover:underline text-sm font-medium"
-                  >
-                    Read Full Article →
-                  </a>
-                </CardContent>
-              </Card>
-            ))
-          )
-        )}
-      </div>
+      {/* Unified Playlist with Drag and Drop */}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext
+          items={unifiedPlaylist.map(item => item.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          <div className="space-y-3">
+            {unifiedPlaylist.map((item) => {
+              const isSelected = item.type === 'summary' 
+                ? selectedListenItems.includes(item.id)
+                : selectedListenNewsItems.includes(item.id);
+              
+              const isEditMode = item.type === 'summary' 
+                ? isListenEditMode 
+                : isListenNewsEditMode;
+
+              return (
+                <DraggablePlaylistItem
+                  key={item.id}
+                  item={item}
+                  isSelected={isSelected}
+                  isEditMode={isEditMode}
+                  onSelect={handleItemSelect}
+                  onTrackJump={handleTrackJump}
+                  onNavigateToSource={() => {
+                    if (item.type === 'summary') {
+                      navigate('/saved');
+                    } else {
+                      navigate('/news');
+                    }
+                  }}
+                />
+              );
+            })}
+          </div>
+        </SortableContext>
+      </DndContext>
+
+      {/* Sticky Media Player */}
+      <StickyMediaPlayer
+        playlist={unifiedPlaylist}
+        currentIndex={currentIndex}
+        onNext={handleNext}
+        onPrevious={handlePrevious}
+      />
     </div>
   );
 };

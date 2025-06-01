@@ -155,7 +155,7 @@ ${markdownInstructions}`
   }
 }
 
-export async function generateAudio(text: string, isPremium: boolean, type?: 'news' | 'user') {
+export async function generateAudio(text: string, isPremium: boolean, type?: 'news' | 'user', title?: string) {
   // Get the current user's session and access token
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
@@ -163,9 +163,15 @@ export async function generateAudio(text: string, isPremium: boolean, type?: 'ne
     throw new Error('User must be authenticated to generate audio');
   }
 
+  // Prepend title if provided
+  let audioText = text;
+  if (title) {
+    audioText = `${title}. ${text}`;
+  }
+
   try {
     const response = await axios.post('/api/text-to-speech', {
-      text,
+      text: audioText,
       isPremium,
       type,
     }, {
@@ -177,7 +183,7 @@ export async function generateAudio(text: string, isPremium: boolean, type?: 'ne
 
     return response.data.audioUrl;
   } catch (error) {
-    const err = error as any;
+    const err = error as { response?: { status: number; data?: { error?: string } } };
     console.error('Error generating audio:', err);
     // If error is a 403 from backend, extract and throw the message
     if (err.response && err.response.status === 403) {

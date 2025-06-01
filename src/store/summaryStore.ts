@@ -209,7 +209,12 @@ export const useSummaryStore = create<SummaryState>((set, get) => ({
     
     set({ isLoading: true, error: null });
     try {
-      const audioUrl = await generateAudio(summary.summary, user.isPremium);
+      const audioUrl = await generateAudio(
+        summary.summary, 
+        user.isPremium, 
+        'user', 
+        summary.title
+      );
       
       // Update the summary with the new audio URL
       const updatedSummary = { ...summary, audioUrl };

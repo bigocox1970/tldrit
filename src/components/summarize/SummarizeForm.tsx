@@ -1,18 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { File, Link as LinkIcon, Text, X } from 'lucide-react';
+import { File, Link as LinkIcon, Text, X, Volume2, Copy } from 'lucide-react';
 import { useSummaryStore } from '../../store/summaryStore';
 import { useAuthStore } from '../../store/authStore';
+import { useAudioStore } from '../../store/audioStore';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Toggle from '../ui/Toggle';
 import Slider from '../ui/Slider';
 import Card, { CardContent } from '../ui/Card';
 import ReactMarkdown from 'react-markdown';
+import UpgradeModal from '../ui/UpgradeModal';
 
 const SummarizeForm: React.FC = () => {
-  const { createSummary, currentSummary, isLoading, summaries } = useSummaryStore();
+  const { createSummary, currentSummary, isLoading, summaries, generateAudioForSummary } = useSummaryStore();
   const { isAuthenticated, user } = useAuthStore();
+  const { currentlyPlaying, isPlaying, toggleAudio } = useAudioStore();
   
   const [inputType, setInputType] = useState<'text' | 'url' | 'file'>('text');
   const [content, setContent] = useState('');
@@ -25,6 +28,11 @@ const SummarizeForm: React.FC = () => {
   const [isDragOver, setIsDragOver] = useState(false);
   // Track the last toggled ELI5 value to trigger summary lookup
   const [pendingEli5Toggle, setPendingEli5Toggle] = useState<null | boolean>(null);
+  
+  // New state for audio and copy functionality
+  const [audioLoading, setAudioLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   
   // Use user's preferred ELI age from profile
   const eli5Age = user?.eli5Age ?? 5;
@@ -222,6 +230,41 @@ const SummarizeForm: React.FC = () => {
     });
   };
   
+  const handleSpeakerClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!currentSummary) return;
+
+    // Check if user is on free plan
+    if (!user?.isPremium) {
+      setShowUpgradeModal(true);
+      return;
+    }
+
+    if (currentSummary.audioUrl) {
+      // Use global audio store to handle playback
+      toggleAudio(currentSummary.id, currentSummary.audioUrl);
+    } else {
+      // Generate audio
+      setAudioLoading(true);
+      try {
+        await generateAudioForSummary(currentSummary.id);
+      } catch (err: unknown) {
+        let message = 'Failed to generate audio.';
+        if (err instanceof Error) message = err.message;
+        setError(message);
+      } finally {
+        setAudioLoading(false);
+      }
+    }
+  };
+
+  const handleCopy = () => {
+    if (!currentSummary) return;
+    navigator.clipboard.writeText(currentSummary.summary);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
   return (
     <div className="relative">
       <Card>
@@ -375,12 +418,74 @@ Paste your, meeting notes, revision, or any long boring document here to TLDRit!
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-2xl w-full max-h-[80vh] flex flex-col relative mt-4" style={{ zIndex: 100 }}>
             <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
               <h3 className="text-lg font-semibold">Summary</h3>
-              <button
-                onClick={() => setShowOverlay(false)}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"
-              >
-                <X size={20} />
-              </button>
+              <div className="flex items-center space-x-2">
+                {currentSummary && (
+                  <>
+                    {/* Copy Button */}
+                    <div className="relative">
+                      <button
+                        onClick={handleCopy}
+                        className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+                        title={copied ? 'Copied!' : 'Copy summary'}
+                      >
+                        <Copy size={20} className="text-gray-600 dark:text-gray-400" />
+                      </button>
+                      {copied && (
+                        <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 px-2 py-1 bg-green-500 text-white text-xs rounded shadow-lg whitespace-nowrap">
+                          Copied!
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Speaker Button */}
+                    <button
+                      onClick={handleSpeakerClick}
+                      disabled={audioLoading}
+                      className={`p-2 rounded-full transition-colors ${
+                        audioLoading 
+                          ? 'animate-pulse bg-green-200 dark:bg-green-800'
+                          : currentlyPlaying === currentSummary.id && isPlaying
+                          ? 'bg-green-600 hover:bg-green-700'
+                          : currentSummary.audioUrl
+                          ? 'bg-green-500 hover:bg-green-600'
+                          : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+                      }`}
+                      title={
+                        audioLoading
+                          ? 'Generating audio...'
+                          : currentlyPlaying === currentSummary.id && isPlaying
+                          ? 'Pause audio'
+                          : currentSummary.audioUrl
+                          ? 'Play audio'
+                          : user?.isPremium
+                          ? 'Generate audio'
+                          : 'Upgrade to Pro for audio'
+                      }
+                    >
+                      <Volume2
+                        size={20}
+                        className={
+                          audioLoading
+                            ? 'text-green-700 dark:text-green-300'
+                            : currentlyPlaying === currentSummary.id && isPlaying
+                            ? 'text-white animate-pulse'
+                            : currentSummary.audioUrl
+                            ? 'text-white'
+                            : 'text-gray-600 dark:text-gray-400'
+                        }
+                      />
+                    </button>
+                  </>
+                )}
+                
+                {/* Close Button */}
+                <button
+                  onClick={() => setShowOverlay(false)}
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"
+                >
+                  <X size={20} />
+                </button>
+              </div>
             </div>
             <div className="p-4 overflow-y-auto flex-1">
               {currentSummary ? (
@@ -432,6 +537,14 @@ Paste your, meeting notes, revision, or any long boring document here to TLDRit!
             </div>
           </div>
         </div>
+      )}
+
+      {/* Upgrade Modal */}
+      {showUpgradeModal && (
+        <UpgradeModal
+          isOpen={showUpgradeModal}
+          onClose={() => setShowUpgradeModal(false)}
+        />
       )}
     </div>
   );

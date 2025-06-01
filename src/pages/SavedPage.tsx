@@ -10,6 +10,8 @@ import { Volume2, Copy, Check, CheckSquare, Square, ChevronDown, Bookmark, Newsp
 import { Summary } from '../types';
 import { getExampleSummaries, getBookmarkedNewsItems } from '../lib/supabase';
 import { useNewsStore } from '../store/newsStore';
+import UpgradeModal from '../components/ui/UpgradeModal';
+import NoAudioModal from '../components/ui/NoAudioModal';
 
 interface BookmarkedNewsItem {
   id: string;
@@ -61,6 +63,11 @@ const SavedPage: React.FC = () => {
   const [selectedNewsItem, setSelectedNewsItem] = useState<string | null>(null);
   const [newsAudioLoading, setNewsAudioLoading] = useState<{ [id: string]: boolean }>({});
   const [newsCopiedId, setNewsCopiedId] = useState<string | null>(null);
+  
+  // Add new state for modals
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [showNoAudioModal, setShowNoAudioModal] = useState(false);
+  const [noAudioItemType, setNoAudioItemType] = useState<'TLDR' | 'news'>('TLDR');
   
   // Fetch bookmarked news items
   const fetchBookmarkedNews = async () => {
@@ -180,6 +187,12 @@ const SavedPage: React.FC = () => {
   const handleSpeakerClick = async (summary: Summary, e: React.MouseEvent) => {
     e.stopPropagation();
     
+    // Check if user is on free plan
+    if (!user?.isPremium) {
+      setShowUpgradeModal(true);
+      return;
+    }
+    
     if (summary.audioUrl) {
       // Use global audio store to handle playback
       toggleAudio(summary.id, summary.audioUrl);
@@ -204,6 +217,8 @@ const SavedPage: React.FC = () => {
   const handleNewsSpeakerClick = async (newsItem: BookmarkedNewsItem, e: React.MouseEvent) => {
     e.stopPropagation();
     
+    // News TTS is free for all users, so no premium check needed
+    
     if (newsItem.audioUrl) {
       // Use global audio store to handle playback
       toggleAudio(newsItem.id, newsItem.audioUrl);
@@ -224,8 +239,29 @@ const SavedPage: React.FC = () => {
     }
   };
 
+  const handlePlaylistToggle = async (summary: Summary) => {
+    if (!user) return;
+    
+    // Check if trying to add to playlist but no audio exists
+    if (!summary.inPlaylist && !summary.audioUrl) {
+      setNoAudioItemType('TLDR');
+      setShowNoAudioModal(true);
+      return;
+    }
+    
+    // Proceed with normal playlist toggle
+    await togglePlaylist(summary.id);
+  };
+
   const handleNewsPlaylistToggle = async (newsItem: BookmarkedNewsItem) => {
     if (!user) return;
+    
+    // Check if trying to add to playlist but no audio exists
+    if (!newsItem.inPlaylist && !newsItem.audioUrl) {
+      setNoAudioItemType('news');
+      setShowNoAudioModal(true);
+      return;
+    }
     
     try {
       // Update in database using the news store's upsert function
@@ -507,7 +543,7 @@ const SavedPage: React.FC = () => {
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    togglePlaylist(summary.id);
+                                    handlePlaylistToggle(summary);
                                   }}
                                   className={`p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${
                                     summary.inPlaylist ? 'bg-purple-100 dark:bg-purple-900/20' : ''
@@ -575,7 +611,7 @@ const SavedPage: React.FC = () => {
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  togglePlaylist(summary.id);
+                                  handlePlaylistToggle(summary);
                                 }}
                                 className={`p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${
                                   summary.inPlaylist ? 'bg-purple-100 dark:bg-purple-900/20' : ''
@@ -860,6 +896,23 @@ const SavedPage: React.FC = () => {
             </div>
           )}
         </div>
+      )}
+      
+      {/* Upgrade Modal */}
+      {showUpgradeModal && (
+        <UpgradeModal
+          isOpen={showUpgradeModal}
+          onClose={() => setShowUpgradeModal(false)}
+        />
+      )}
+
+      {/* No Audio Modal */}
+      {showNoAudioModal && (
+        <NoAudioModal
+          isOpen={showNoAudioModal}
+          onClose={() => setShowNoAudioModal(false)}
+          itemType={noAudioItemType}
+        />
       )}
     </div>
   );
