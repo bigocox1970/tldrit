@@ -95,7 +95,7 @@ const DraggablePlaylistItem: React.FC<DraggablePlaylistItemProps> = ({
             <div 
               {...attributes}
               {...listeners}
-              className="cursor-grab active:cursor-grabbing p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
+              className="cursor-grab active:cursor-grabbing p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded touch-none"
             >
               <GripVertical size={16} className="text-gray-400" />
             </div>
