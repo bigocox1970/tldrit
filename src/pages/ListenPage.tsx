@@ -234,7 +234,6 @@ const ListenPage: React.FC = () => {
       category: news.category,
       publishedAt: news.publishedAt,
       sourceUrl: news.sourceUrl,
-      imageUrl: news.imageUrl,
     }));
 
     const allItems = [...summaryItems, ...newsItems];

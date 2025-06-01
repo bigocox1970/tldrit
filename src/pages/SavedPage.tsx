@@ -106,10 +106,6 @@ const SavedPage: React.FC = () => {
           url_to_image: newsData.url_to_image,
           urlToImage: newsData.urlToImage
         });
-        
-        // Debug image URL
-        const imageUrl = newsData.urlToImage || newsData.url_to_image || newsData.image_url;
-        console.log('Using image URL:', imageUrl);
         return {
           id: newsData.id,
           title: newsData.title,
@@ -549,27 +545,17 @@ const SavedPage: React.FC = () => {
               </CardContent>
             </Card>
           ) : (
-          <div className="space-y-4">
-            {summaries.map((summary) => (
+            <div className="space-y-4">
+              {summaries.map((summary) => (
                 <Card 
                   key={summary.id}
                   onClick={() => handleSummaryClick(summary.id)}
-                  className={`cursor-pointer hover:border-blue-300 border transition-all relative overflow-hidden ${
+                  className={`cursor-pointer hover:border-blue-300 border transition-all ${
                     selectedSummaries.includes(summary.id)
                       ? 'border-blue-500 dark:border-blue-400'
                       : 'border-gray-200 dark:border-gray-700'
                   }`}
                 >
-                  <div 
-                    className="absolute inset-0 opacity-10" 
-                    style={{
-                      backgroundImage: `url("/TLDRit-logo.png")`,
-                      backgroundSize: 'contain',
-                      backgroundPosition: 'center',
-                      backgroundRepeat: 'no-repeat',
-                      zIndex: 0
-                    }}
-                  />
                   <CardContent>
                     <div className="flex items-start gap-4">
                       {isEditMode && (
@@ -791,36 +777,13 @@ const SavedPage: React.FC = () => {
                 <Card 
                   key={newsItem.id}
                   onClick={() => handleNewsClick(newsItem.id)}
-                  className={`cursor-pointer hover:border-blue-300 border border-gray-200 dark:border-gray-700 transition-all relative overflow-hidden ${
+                  className={`cursor-pointer hover:border-blue-300 border border-gray-200 dark:border-gray-700 transition-all ${
                     isSavedNewsEditMode && selectedSavedNewsItems.includes(newsItem.id) 
                       ? 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-900/20' 
                       : ''
                   }`}
                 >
-                  {newsItem.imageUrl ? (
-                    <div 
-                      className="absolute inset-0 opacity-20" 
-                      style={{
-                        backgroundImage: `url("${newsItem.imageUrl}")`,
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'center',
-                        backgroundRepeat: 'no-repeat',
-                        zIndex: 0
-                      }}
-                    />
-                  ) : (
-                    <div 
-                      className="absolute inset-0 opacity-40" 
-                      style={{
-                        backgroundImage: `url("/images/categories/${newsItem.category || 'default'}.jpg")`,
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'center',
-                        backgroundRepeat: 'no-repeat',
-                        zIndex: 0
-                      }}
-                    />
-                  )}
-                  <CardContent className="relative z-10 bg-white/60 dark:bg-gray-800/80 rounded-lg">
+                  <CardContent>
                     {isSavedNewsEditMode && (
                       <div className="flex items-center mb-3">
                         <button
@@ -838,7 +801,6 @@ const SavedPage: React.FC = () => {
                         </button>
                       </div>
                     )}
-                    
                     
                     <div className="flex justify-between items-start mb-2">
                       <span className="text-sm font-medium px-2 py-1 rounded-full bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300">
@@ -913,9 +875,22 @@ const SavedPage: React.FC = () => {
                       <div 
                         className="mb-4 p-3 rounded-lg border border-blue-200 dark:border-blue-800 relative overflow-hidden"
                         style={{
+                          backgroundImage: newsItem.imageUrl 
+                            ? `url(${newsItem.imageUrl})`
+                            : 'none',
                           backgroundColor: newsItem.imageUrl ? 'transparent' : 'rgb(239 246 255)',
+                          backgroundSize: 'cover',
+                          backgroundPosition: 'center',
+                          minHeight: '200px'
                         }}
                       >
+                        {/* Semi-transparent overlay for better readability */}
+                        {newsItem.imageUrl && (
+                          <div 
+                            className="absolute inset-0 bg-white/30 dark:bg-gray-800/40" 
+                            style={{ zIndex: 1 }}
+                          />
+                        )}
                         <div className="flex justify-between items-start mb-2 relative z-10">
                           <div className="flex items-center space-x-2">
                             <FileText size={16} className="text-blue-600 dark:text-blue-400" />
