@@ -43,13 +43,36 @@ interface TLDROptions {
 }
 
 function getEliPrompt(age: number) {
-  if (age <= 5) {
-    return 'Explain in very simple terms, as if to a 5-year-old.';
-  } else if (age <= 10) {
-    return 'Explain in moderately simple terms, as if to a 10-year-old.';
-  } else {
-    return 'Explain in clear, but more advanced terms, as if to a 15-year-old.';
-  }
+  if (age <= 5) return 'Explain this like I\'m 5 years old.';
+  if (age <= 8) return 'Explain this like I\'m 8 years old.';
+  if (age <= 12) return 'Explain this like I\'m 12 years old.';
+  if (age <= 16) return 'Explain this like I\'m a teenager.';
+  return 'Explain this clearly but thoroughly for an adult.';
+}
+
+// Function to strip markdown formatting for TTS
+function stripMarkdownForTTS(text: string): string {
+  return text
+    // Remove headers (## Header -> Header)
+    .replace(/#{1,6}\s*/g, '')
+    // Remove bold/italic formatting (**text** -> text, *text* -> text)
+    .replace(/\*{1,2}([^*]+)\*{1,2}/g, '$1')
+    // Remove links [text](url) -> text
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    // Remove bullet points (- item -> item)
+    .replace(/^\s*[-*+]\s+/gm, '')
+    // Remove numbered lists (1. item -> item)
+    .replace(/^\s*\d+\.\s+/gm, '')
+    // Remove code blocks and inline code
+    .replace(/`{1,3}[^`]*`{1,3}/g, '')
+    // Remove horizontal rules
+    .replace(/^\s*---+\s*$/gm, '')
+    // Replace multiple line breaks with a single space for better TTS flow
+    .replace(/\n+/g, ' ')
+    // Clean up multiple spaces
+    .replace(/\s+/g, ' ')
+    // Clean up extra whitespace
+    .trim();
 }
 
 export async function summarizeContent(content: string, options: SummarizeOptions) {
@@ -155,7 +178,7 @@ ${markdownInstructions}`
   }
 }
 
-export async function generateAudio(text: string, isPremium: boolean, type?: 'news' | 'user', title?: string) {
+export async function generateAudio(text: string, isPremium: boolean, type?: 'news' | 'user', title?: string, sourceUrl?: string) {
   // Get the current user's session and access token
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
@@ -163,18 +186,33 @@ export async function generateAudio(text: string, isPremium: boolean, type?: 'ne
     throw new Error('User must be authenticated to generate audio');
   }
 
+  // Strip markdown formatting from text for better TTS
+  const cleanText = stripMarkdownForTTS(text);
+
   // Prepend title if provided
-  let audioText = text;
+  let audioText = cleanText;
   if (title) {
-    audioText = `${title}. ${text}`;
+    audioText = `${title}. ${cleanText}`;
   }
 
   try {
-    const response = await axios.post('/api/text-to-speech', {
+    const requestBody: {
+      text: string;
+      isPremium: boolean;
+      type?: 'news' | 'user';
+      sourceUrl?: string;
+    } = {
       text: audioText,
       isPremium,
       type,
-    }, {
+    };
+
+    // Include sourceUrl for news items to help with database tracking
+    if (type === 'news' && sourceUrl) {
+      requestBody.sourceUrl = sourceUrl;
+    }
+
+    const response = await axios.post('/api/text-to-speech', requestBody, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',

@@ -67,6 +67,44 @@ const RSS_SOURCES = {
   ]
 };
 
+// Function to decode HTML entities
+function decodeHtmlEntities(text: string): string {
+  const entities: { [key: string]: string } = {
+    '&amp;': '&',
+    '&lt;': '<',
+    '&gt;': '>',
+    '&quot;': '"',
+    '&#39;': "'",
+    '&#039;': "'",
+    '&apos;': "'",
+    '&nbsp;': ' ',
+    '&copy;': '©',
+    '&reg;': '®',
+    '&trade;': '™',
+    '&euro;': '€',
+    '&pound;': '£',
+    '&yen;': '¥',
+    '&cent;': '¢'
+  };
+
+  // Replace named entities
+  let decoded = text.replace(/&[a-zA-Z0-9#]+;/g, (match) => {
+    return entities[match] || match;
+  });
+
+  // Replace numeric entities (decimal)
+  decoded = decoded.replace(/&#(\d+);/g, (match, num) => {
+    return String.fromCharCode(parseInt(num, 10));
+  });
+
+  // Replace numeric entities (hexadecimal)
+  decoded = decoded.replace(/&#x([0-9a-fA-F]+);/g, (match, hex) => {
+    return String.fromCharCode(parseInt(hex, 16));
+  });
+
+  return decoded;
+}
+
 async function fetchRSSFeed(url: string): Promise<NewsItem[]> {
   try {
     console.log(`Fetching RSS feed for ${url}...`);
@@ -106,9 +144,9 @@ async function fetchRSSFeed(url: string): Promise<NewsItem[]> {
         // Extract title with type checking
         let title: string | undefined;
         if (typeof item.title === 'string') {
-          title = item.title;
+          title = decodeHtmlEntities(item.title);
         } else if (item.title?.['#text']) {
-          title = item.title['#text'];
+          title = decodeHtmlEntities(item.title['#text']);
         }
 
         // Extract link with type checking
@@ -174,7 +212,7 @@ async function fetchRSSFeed(url: string): Promise<NewsItem[]> {
           }
 
           // Clean up description
-          const cleanDescription = description.replace(/<[^>]*>/g, '').trim();
+          const cleanDescription = decodeHtmlEntities(description.replace(/<[^>]*>/g, '')).trim();
 
           newsItems.push({
             id: `${url}-${index}-${Date.now()}`,

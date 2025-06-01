@@ -131,6 +131,46 @@ function getCategoryImage(category) {
   return defaultImages[category] || '/images/categories/default.jpg';
 }
 
+// Function to decode HTML entities
+function decodeHtmlEntities(text) {
+  if (!text) return text;
+  
+  const entities = {
+    '&amp;': '&',
+    '&lt;': '<',
+    '&gt;': '>',
+    '&quot;': '"',
+    '&#39;': "'",
+    '&#039;': "'",
+    '&apos;': "'",
+    '&nbsp;': ' ',
+    '&copy;': '©',
+    '&reg;': '®',
+    '&trade;': '™',
+    '&euro;': '€',
+    '&pound;': '£',
+    '&yen;': '¥',
+    '&cent;': '¢'
+  };
+
+  // Replace named entities
+  let decoded = text.replace(/&[a-zA-Z0-9#]+;/g, (match) => {
+    return entities[match] || match;
+  });
+
+  // Replace numeric entities (decimal)
+  decoded = decoded.replace(/&#(\d+);/g, (match, num) => {
+    return String.fromCharCode(parseInt(num, 10));
+  });
+
+  // Replace numeric entities (hexadecimal)
+  decoded = decoded.replace(/&#x([0-9a-fA-F]+);/g, (match, hex) => {
+    return String.fromCharCode(parseInt(hex, 16));
+  });
+
+  return decoded;
+}
+
 exports.handler = async function(event) {
   try {
     const parser = new Parser({
@@ -202,7 +242,7 @@ exports.handler = async function(event) {
 
       return {
         id: newsId,
-        title: item.title,
+        title: decodeHtmlEntities(item.title),
         description: item.contentSnippet || item.description,
         link: item.link,
         image: imageUrl,

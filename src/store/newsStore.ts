@@ -334,7 +334,8 @@ export const useNewsStore = create<NewsState>((set, get) => ({
         audioText, 
         user.isPremium, 
         'news', 
-        newsItem.title
+        newsItem.title,
+        newsItem.sourceUrl
       );
       // Minimal required fields for audio upsert
       const audioUpsertPayload = {
