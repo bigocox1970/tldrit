@@ -17,6 +17,7 @@ interface PlaylistItem {
   isEli5?: boolean;
   summaryLevel?: number;
   sourceUrl?: string;
+  imageUrl?: string;
 }
 
 interface DraggablePlaylistItemProps {
@@ -76,10 +77,12 @@ const DraggablePlaylistItem: React.FC<DraggablePlaylistItemProps> = ({
       className={`${isDragging ? 'z-50' : ''}`}
     >
       <Card 
-        className={`border transition-colors ${
+        className={`border transition-colors relative overflow-hidden ${
           currentlyPlaying === item.id && isPlaying
             ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-md'
-            : 'border-gray-200 dark:border-gray-700'
+            : item.type === 'news'
+              ? 'border-gray-400 dark:border-gray-500'
+              : 'border-gray-200 dark:border-gray-700'
         } ${
           isEditMode && isSelected 
             ? 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-900/20' 
@@ -89,7 +92,43 @@ const DraggablePlaylistItem: React.FC<DraggablePlaylistItemProps> = ({
         }`}
         onClick={handleItemClick}
       >
-        <CardContent className="py-3 px-4">
+        {item.type === 'news' && item.imageUrl && (
+          <div 
+            className="absolute inset-0 opacity-20" 
+            style={{
+              backgroundImage: `url("${item.imageUrl}")`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+              zIndex: 0
+            }}
+          />
+        )}
+        {item.type === 'news' && !item.imageUrl && item.category && (
+          <div 
+            className="absolute inset-0 opacity-40" 
+            style={{
+              backgroundImage: `url("/images/categories/${item.category || 'default'}.jpg")`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+              zIndex: 0
+            }}
+          />
+        )}
+        {item.type === 'summary' && (
+          <div 
+            className="absolute inset-0 opacity-10" 
+            style={{
+              backgroundImage: `url("/TLDRit-logo.png")`,
+              backgroundSize: 'contain',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+              zIndex: 0
+            }}
+          />
+        )}
+        <CardContent className="py-3 px-4 relative z-10 bg-white/60 dark:bg-gray-800/80 rounded-lg">
           <div className="flex items-center gap-3">
             {/* Drag handle */}
             <div 
@@ -221,4 +260,4 @@ const DraggablePlaylistItem: React.FC<DraggablePlaylistItemProps> = ({
   );
 };
 
-export default DraggablePlaylistItem; 
+export default DraggablePlaylistItem;

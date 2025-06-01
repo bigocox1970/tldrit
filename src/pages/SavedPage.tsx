@@ -81,7 +81,9 @@ const SavedPage: React.FC = () => {
       }
       
       // Transform the data - using type assertion as the data structure from Supabase may vary
+      console.log('Raw data from Supabase:', JSON.stringify(data, null, 2));
       const newsItems: BookmarkedNewsItem[] = (data as unknown[])?.map((item) => {
+        console.log('Individual news item raw data:', JSON.stringify(item, null, 2));
         const metaData = item as { 
           in_playlist?: boolean;
           news: {
@@ -94,9 +96,20 @@ const SavedPage: React.FC = () => {
             category: string;
             published_at: string;
             image_url?: string;
+            url_to_image?: string;
+            urlToImage?: string;
           }
         };
         const newsData = metaData.news;
+        console.log('News data fields:', {
+          image_url: newsData.image_url,
+          url_to_image: newsData.url_to_image,
+          urlToImage: newsData.urlToImage
+        });
+        
+        // Debug image URL
+        const imageUrl = newsData.urlToImage || newsData.url_to_image || newsData.image_url;
+        console.log('Using image URL:', imageUrl);
         return {
           id: newsData.id,
           title: newsData.title,
@@ -106,7 +119,7 @@ const SavedPage: React.FC = () => {
           audioUrl: newsData.audio_url,
           category: newsData.category,
           publishedAt: newsData.published_at,
-          imageUrl: newsData.image_url,
+          imageUrl: newsData.urlToImage || newsData.url_to_image || newsData.image_url, // Try all possible image URL fields
           inPlaylist: metaData.in_playlist || false,
         };
       }) || [];
@@ -536,17 +549,27 @@ const SavedPage: React.FC = () => {
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-4">
-              {summaries.map((summary) => (
+          <div className="space-y-4">
+            {summaries.map((summary) => (
                 <Card 
                   key={summary.id}
                   onClick={() => handleSummaryClick(summary.id)}
-                  className={`cursor-pointer hover:border-blue-300 border transition-all ${
+                  className={`cursor-pointer hover:border-blue-300 border transition-all relative overflow-hidden ${
                     selectedSummaries.includes(summary.id)
                       ? 'border-blue-500 dark:border-blue-400'
                       : 'border-gray-200 dark:border-gray-700'
                   }`}
                 >
+                  <div 
+                    className="absolute inset-0 opacity-10" 
+                    style={{
+                      backgroundImage: `url("/TLDRit-logo.png")`,
+                      backgroundSize: 'contain',
+                      backgroundPosition: 'center',
+                      backgroundRepeat: 'no-repeat',
+                      zIndex: 0
+                    }}
+                  />
                   <CardContent>
                     <div className="flex items-start gap-4">
                       {isEditMode && (
@@ -768,13 +791,36 @@ const SavedPage: React.FC = () => {
                 <Card 
                   key={newsItem.id}
                   onClick={() => handleNewsClick(newsItem.id)}
-                  className={`cursor-pointer hover:border-blue-300 border border-gray-200 dark:border-gray-700 transition-all ${
+                  className={`cursor-pointer hover:border-blue-300 border border-gray-200 dark:border-gray-700 transition-all relative overflow-hidden ${
                     isSavedNewsEditMode && selectedSavedNewsItems.includes(newsItem.id) 
                       ? 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-900/20' 
                       : ''
                   }`}
                 >
-                  <CardContent>
+                  {newsItem.imageUrl ? (
+                    <div 
+                      className="absolute inset-0 opacity-20" 
+                      style={{
+                        backgroundImage: `url("${newsItem.imageUrl}")`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                        backgroundRepeat: 'no-repeat',
+                        zIndex: 0
+                      }}
+                    />
+                  ) : (
+                    <div 
+                      className="absolute inset-0 opacity-40" 
+                      style={{
+                        backgroundImage: `url("/images/categories/${newsItem.category || 'default'}.jpg")`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                        backgroundRepeat: 'no-repeat',
+                        zIndex: 0
+                      }}
+                    />
+                  )}
+                  <CardContent className="relative z-10 bg-white/60 dark:bg-gray-800/80 rounded-lg">
                     {isSavedNewsEditMode && (
                       <div className="flex items-center mb-3">
                         <button
@@ -793,18 +839,6 @@ const SavedPage: React.FC = () => {
                       </div>
                     )}
                     
-                    {newsItem.imageUrl && (
-                      <div className="w-full h-48 overflow-hidden mb-4 rounded-lg">
-                        <img 
-                          src={newsItem.imageUrl} 
-                          alt={newsItem.title} 
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).style.display = 'none';
-                          }}
-                        />
-                      </div>
-                    )}
                     
                     <div className="flex justify-between items-start mb-2">
                       <span className="text-sm font-medium px-2 py-1 rounded-full bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300">
@@ -876,8 +910,13 @@ const SavedPage: React.FC = () => {
                     </div>
 
                     {selectedNewsItem === newsItem.id && newsItem.tldr && (
-                      <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                        <div className="flex justify-between items-start mb-2">
+                      <div 
+                        className="mb-4 p-3 rounded-lg border border-blue-200 dark:border-blue-800 relative overflow-hidden"
+                        style={{
+                          backgroundColor: newsItem.imageUrl ? 'transparent' : 'rgb(239 246 255)',
+                        }}
+                      >
+                        <div className="flex justify-between items-start mb-2 relative z-10">
                           <div className="flex items-center space-x-2">
                             <FileText size={16} className="text-blue-600 dark:text-blue-400" />
                             <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
@@ -902,7 +941,7 @@ const SavedPage: React.FC = () => {
                             )}
                           </div>
                         </div>
-                        <div className="prose prose-blue max-w-none dark:prose-invert">
+                        <div className="prose prose-blue max-w-none dark:prose-invert relative z-10">
                           <ReactMarkdown>{newsItem.tldr}</ReactMarkdown>
                         </div>
                       </div>

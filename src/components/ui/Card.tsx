@@ -4,12 +4,14 @@ interface CardProps {
   children: React.ReactNode;
   className?: string;
   onClick?: () => void;
+  style?: React.CSSProperties;
 }
 
 const Card: React.FC<CardProps> = ({
   children,
   className = '',
   onClick,
+  style,
 }) => {
   return (
     <div
@@ -22,6 +24,7 @@ const Card: React.FC<CardProps> = ({
         ${className}
       `}
       onClick={onClick}
+      style={style}
     >
       {children}
     </div>

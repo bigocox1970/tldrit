@@ -359,7 +359,8 @@ export const useNewsStore = create<NewsState>((set, get) => ({
         summary: newsItem.summary,
         category: newsItem.category,
         audio_url: audioUrl,
-        published_at: newsItem.publishedAt
+        published_at: newsItem.publishedAt,
+        image_url: newsItem.imageUrl // Save the image URL when generating audio
       };
       console.log('Upserting audio to Supabase:', audioUpsertPayload);
       await upsertNewsByUrlHash(audioUpsertPayload);
@@ -431,7 +432,8 @@ export const useNewsStore = create<NewsState>((set, get) => ({
         summary: newsItem.summary,
         tldr: tldrSummary,
         category: newsItem.category,
-        published_at: newsItem.publishedAt
+        published_at: newsItem.publishedAt,
+        image_url: newsItem.imageUrl // Save the image URL when generating TLDR
       };
       console.log('Upserting TLDR to Supabase:', tldrUpsertPayload);
       const upsertResult = await upsertNewsByUrlHash(tldrUpsertPayload);
@@ -490,7 +492,8 @@ export const useNewsStore = create<NewsState>((set, get) => ({
         title: item.title,
         summary: item.summary,
         category: item.category,
-        published_at: item.publishedAt
+        published_at: item.publishedAt,
+        image_url: item.imageUrl // Save the image URL when bookmarking
       };
       
       try {
@@ -579,7 +582,8 @@ export const useNewsStore = create<NewsState>((set, get) => ({
         title: item.title,
         summary: item.summary,
         category: item.category,
-        published_at: item.publishedAt
+        published_at: item.publishedAt,
+        image_url: item.imageUrl // Save the image URL when adding to playlist
       };
       
       try {
