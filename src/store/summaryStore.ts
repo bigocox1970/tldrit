@@ -316,6 +316,8 @@ export const useSummaryStore = create<SummaryState>((set, get) => ({
     const user = useAuthStore.getState().user;
     if (!user) return;
 
+    console.log('[Summary Store] removeFromPlaylist called with:', itemIds);
+    
     set({ isLoading: true, error: null });
     try {
       // Remove items from playlist by setting inPlaylist to false
@@ -323,13 +325,16 @@ export const useSummaryStore = create<SummaryState>((set, get) => ({
         get().togglePlaylist(id)
       ));
       
+      console.log('[Summary Store] removeFromPlaylist completed successfully');
+      
       // Clear selection and exit edit mode
       set({ 
         selectedListenItems: [], 
         isListenEditMode: false,
         isLoading: false 
       });
-    } catch {
+    } catch (error) {
+      console.error('[Summary Store] removeFromPlaylist error:', error);
       set({ 
         error: 'Failed to remove items from playlist', 
         isLoading: false 

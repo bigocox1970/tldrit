@@ -135,6 +135,18 @@ const SavedPage: React.FC = () => {
     }
   }, [isAuthenticated, fetchSummaries]);
   
+  // Listen for custom event to refresh bookmarked news
+  useEffect(() => {
+    const handleRefreshBookmarkedNews = () => {
+      if (isAuthenticated) {
+        fetchBookmarkedNews();
+      }
+    };
+
+    window.addEventListener('refreshBookmarkedNews', handleRefreshBookmarkedNews);
+    return () => window.removeEventListener('refreshBookmarkedNews', handleRefreshBookmarkedNews);
+  }, [isAuthenticated]);
+  
   const handleSummaryClick = (summaryId: string) => {
     if (isEditMode) {
       // In edit mode - handle selection

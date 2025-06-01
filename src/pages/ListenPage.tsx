@@ -96,9 +96,12 @@ const ListenPage: React.FC = () => {
   const fetchPlaylistNews = async () => {
     if (!user) return;
     
+    console.log('[Listen Page] fetchPlaylistNews starting...');
     setNewsLoading(true);
     try {
       const { data, error } = await getPlaylistNewsItems(user.id);
+      console.log('[Listen Page] getPlaylistNewsItems result:', { data, error });
+      
       if (error) {
         console.error('Error fetching playlist news:', error);
         return;
@@ -132,11 +135,26 @@ const ListenPage: React.FC = () => {
         };
       }) || [];
       
+      console.log('[Listen Page] fetchPlaylistNews transformed newsItems:', newsItems.length, 'items');
+      console.log('[Listen Page] fetchPlaylistNews newsItems IDs:', newsItems.map(item => item.id));
+      
       setPlaylistNews(newsItems);
     } catch (error) {
       console.error('Error fetching playlist news:', error);
     } finally {
       setNewsLoading(false);
+    }
+  };
+
+  // Combined refresh function for both summaries and playlist news
+  const refreshAllData = async () => {
+    if (isAuthenticated) {
+      console.log('[Listen Page] refreshAllData called');
+      await Promise.all([
+        fetchSummaries(),
+        fetchPlaylistNews()
+      ]);
+      console.log('[Listen Page] refreshAllData completed');
     }
   };
 
@@ -166,6 +184,33 @@ const ListenPage: React.FC = () => {
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [isAuthenticated, fetchSummaries]);
+
+  // Add effect to refresh data when selection states change (after deletes)
+  useEffect(() => {
+    const hasNoSelections = selectedListenItems.length === 0 && selectedListenNewsItems.length === 0;
+    const isNotInEditMode = !isListenEditMode && !isListenNewsEditMode;
+    
+    // If we just exited edit mode (no selections and not in edit mode), refresh data
+    if (hasNoSelections && isNotInEditMode && isAuthenticated) {
+      // Add a small delay to ensure store operations have completed
+      const timeoutId = setTimeout(() => {
+        refreshAllData();
+      }, 100);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [selectedListenItems.length, selectedListenNewsItems.length, isListenEditMode, isListenNewsEditMode, isAuthenticated]);
+
+  // Also refresh when page becomes visible after potential changes
+  useEffect(() => {
+    const handleFocus = () => {
+      if (isAuthenticated) {
+        refreshAllData();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [isAuthenticated]);
 
   // Create unified playlist
   const unifiedPlaylist = useMemo(() => {

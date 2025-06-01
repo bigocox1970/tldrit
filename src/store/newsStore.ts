@@ -82,12 +82,18 @@ export const useNewsStore = create<NewsState>((set, get) => ({
     const user = useAuthStore.getState().user;
     if (!user) return;
     
+    console.log('[News Store] deleteSelectedNewsItems called with:', itemIds);
+    
     set({ isLoading: true, error: null });
     try {
-      // For saved page, we want to remove bookmarks (which will remove them from saved page)
-      await Promise.all(itemIds.map(id => 
-        get().toggleBookmark(id)
-      ));
+      // For saved page items, we need to work directly with database IDs
+      // Instead of using toggleBookmark, directly update the user_news_meta table
+      await Promise.all(itemIds.map(async (id) => {
+        console.log('[News Store] Setting bookmarked=false for database ID:', id);
+        return upsertUserNewsMeta(user.id, id, { bookmarked: false });
+      }));
+      
+      console.log('[News Store] deleteSelectedNewsItems completed successfully');
       
       // Clear selection and exit edit mode
       set({ 
@@ -95,7 +101,8 @@ export const useNewsStore = create<NewsState>((set, get) => ({
         isSavedNewsEditMode: false,
         isLoading: false 
       });
-    } catch {
+    } catch (error) {
+      console.error('[News Store] deleteSelectedNewsItems error:', error);
       set({ 
         error: 'Failed to delete news items', 
         isLoading: false 
@@ -106,12 +113,18 @@ export const useNewsStore = create<NewsState>((set, get) => ({
     const user = useAuthStore.getState().user;
     if (!user) return;
     
+    console.log('[News Store] removeNewsFromPlaylist called with:', itemIds);
+
     set({ isLoading: true, error: null });
     try {
-      // Remove items from playlist by toggling their playlist status
-      await Promise.all(itemIds.map(id => 
-        get().togglePlaylist(id)
-      ));
+      // For playlist items, we need to work directly with database IDs
+      // Instead of using togglePlaylist, directly update the user_news_meta table
+      await Promise.all(itemIds.map(async (id) => {
+        console.log('[News Store] Setting inPlaylist=false for database ID:', id);
+        return upsertUserNewsMeta(user.id, id, { in_playlist: false });
+      }));
+      
+      console.log('[News Store] removeNewsFromPlaylist completed successfully');
       
       // Clear selection and exit edit mode
       set({ 
@@ -119,7 +132,8 @@ export const useNewsStore = create<NewsState>((set, get) => ({
         isListenNewsEditMode: false,
         isLoading: false 
       });
-    } catch {
+    } catch (error) {
+      console.error('[News Store] removeNewsFromPlaylist error:', error);
       set({ 
         error: 'Failed to remove news items from playlist', 
         isLoading: false 
@@ -529,6 +543,8 @@ export const useNewsStore = create<NewsState>((set, get) => ({
     const user = useAuthStore.getState().user;
     if (!user) return;
     
+    console.log('[News Store] togglePlaylist called for newsItemId:', newsItemId);
+    
     // Update UI immediately
     set(state => ({
       newsItems: state.newsItems.map(item =>
@@ -539,7 +555,18 @@ export const useNewsStore = create<NewsState>((set, get) => ({
     }));
     
     const item = get().newsItems.find(item => item.id === newsItemId);
-    if (!item) return;
+    if (!item) {
+      console.log('[News Store] togglePlaylist: item NOT FOUND in newsItems for ID:', newsItemId);
+      console.log('[News Store] togglePlaylist: available newsItems IDs:', get().newsItems.map(i => i.id));
+      return;
+    }
+    
+    console.log('[News Store] togglePlaylist: found item:', { 
+      id: item.id, 
+      dbId: item.dbId, 
+      currentInPlaylist: item.inPlaylist,
+      willBeInPlaylist: !item.inPlaylist 
+    });
     
     let dbId = item.dbId;
     

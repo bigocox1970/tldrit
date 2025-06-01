@@ -13,14 +13,15 @@ const Header: React.FC<HeaderProps> = ({ isDarkMode, toggleDarkMode }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { 
-    selectedSummaries, 
-    deleteSummaries, 
-    isEditMode, 
+    selectedSummaries,
+    isEditMode,
     setEditMode,
+    deleteSummaries,
+    removeFromPlaylist,
     selectedListenItems,
     isListenEditMode,
     setListenEditMode,
-    removeFromPlaylist
+    fetchSummaries
   } = useSummaryStore();
   
   const {
@@ -72,6 +73,10 @@ const Header: React.FC<HeaderProps> = ({ isDarkMode, toggleDarkMode }) => {
       if (selectedSavedNewsItems.length > 0) {
         await deleteSelectedNewsItems(selectedSavedNewsItems);
       }
+      // Refresh summaries data after delete operations
+      await fetchSummaries();
+      // Dispatch custom event to refresh bookmarked news without full page reload
+      window.dispatchEvent(new CustomEvent('refreshBookmarkedNews'));
     } else if (isListenPage && window.confirm('Are you sure you want to remove the selected items from your playlist?')) {
       // Handle both summary and news item removal from playlist
       if (selectedListenItems.length > 0) {
@@ -80,6 +85,8 @@ const Header: React.FC<HeaderProps> = ({ isDarkMode, toggleDarkMode }) => {
       if (selectedListenNewsItems.length > 0) {
         await removeNewsFromPlaylist(selectedListenNewsItems);
       }
+      // Refresh summaries data after removal operations
+      await fetchSummaries();
     }
   };
 
