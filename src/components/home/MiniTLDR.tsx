@@ -96,7 +96,7 @@ const MiniTLDR: React.FC = () => {
 
   return (
     <div className="w-full max-w-3xl mx-auto mt-8 px-4">
-      <Card className="p-6 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm">
+      <Card className="p-6 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200 dark:border-gray-700">
         <div className="flex flex-col gap-4">
           <textarea
             value={content}

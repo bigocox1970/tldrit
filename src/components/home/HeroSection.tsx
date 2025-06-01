@@ -44,9 +44,15 @@ const HeroSection: React.FC = () => {
         }, 2500);
       }
     } else {
-      interval = setTimeout(() => {
-        setCurrentTextIndex((i) => i + 1);
-      }, 1800);
+      // Add dots animation before changing text
+      if (dotCount < 3) {
+        interval = setTimeout(() => setDotCount(dotCount + 1), 250);
+      } else {
+        interval = setTimeout(() => {
+          setCurrentTextIndex((i) => i + 1);
+          setDotCount(1);
+        }, 600);
+      }
     }
     return () => clearTimeout(interval);
   }, [currentTextIndex, ohStep, dotCount]);
@@ -94,13 +100,15 @@ const HeroSection: React.FC = () => {
             {renderSpecialScroller()}
           </span>
         ) : (
-          <>
-            <span className="text-gray-900 dark:text-white font-extrabold">TLDR</span>{' '}
-            <span className="inline-block transition-all duration-500 ease-in-out text-blue-600 dark:text-blue-400">
+          <div className="flex flex-wrap items-center justify-center gap-x-2">
+            <span className="text-gray-900 dark:text-white font-extrabold">TLDR</span>
+            <span className="whitespace-nowrap transition-all duration-500 ease-in-out text-blue-600 dark:text-blue-400">
               {dynamicTexts[currentTextIndex]}
+              <span className="inline-block text-gray-900 dark:text-white ml-1" style={{ transform: `translateX(${(dotCount - 1) * 4}px)` }}>
+                {'.'.repeat(dotCount)}
+              </span>
             </span>
-            ...
-          </>
+          </div>
         )}
       </h2>
       <p className="text-2xl font-semibold text-gray-800 dark:text-gray-200 mb-6">
