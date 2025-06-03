@@ -77,12 +77,12 @@ function stripMarkdownForTTS(text: string): string {
 
 function getSummaryLengthFromLevel(level: number): number {
   // Map summary level (1-3) to word count
-  // Level 1: TLDR - short but captures all key points
-  // Level 2: Abbreviated - 50% shorter than full content
+  // Level 1: Short - concise but captures all key points
+  // Level 2: Long - substantial and detailed
   // Level 3: Full - return original content without summarization
   const wordCounts = {
-    1: 150,   // TLDR - captures key points concisely
-    2: 400,   // Abbreviated - substantial but condensed
+    1: 150,   // Short - captures key points concisely
+    2: 400,   // Long - substantial but condensed
     3: 0,     // Full - special case, return original content
   };
   
@@ -126,15 +126,15 @@ ${isEli5 ? `\nYou specialize in explaining complex topics in simple terms that a
   // Create enhanced user message based on summary level
   let summaryTypePrompt = '';
   if (summaryLevel === 1) {
-    // TLDR - short but comprehensive key points
+    // Short - concise but comprehensive key points
     summaryTypePrompt = isNewsArticle 
-      ? `Create a TLDR summary that captures ALL the key facts, events, and important details from this news article in about ${summaryLength} words.\n\n- Focus on the essential information someone needs to know\n- Include all major facts, figures, and developments\n- Maintain context and significance\n- Be concise but comprehensive - don't miss important details`
-      : `Create a TLDR summary that captures ALL the key points and essential information in about ${summaryLength} words.\n\n- Include all major concepts, facts, and important details\n- Be concise but comprehensive - don't miss important information\n- Focus on what someone really needs to know`;
+      ? `Create a short summary that captures ALL the key facts, events, and important details from this news article in about ${summaryLength} words.\n\n- Focus on the essential information someone needs to know\n- Include all major facts, figures, and developments\n- Maintain context and significance\n- Be concise but comprehensive - don't miss important details`
+      : `Create a short summary that captures ALL the key points and essential information in about ${summaryLength} words.\n\n- Include all major concepts, facts, and important details\n- Be concise but comprehensive - don't miss important information\n- Focus on what someone really needs to know`;
   } else if (summaryLevel === 2) {
-    // Abbreviated - about 50% shorter than full content
+    // Long - detailed and comprehensive 
     summaryTypePrompt = isNewsArticle 
-      ? `Create an abbreviated summary of this news article in about ${summaryLength} words.\n\n- Include detailed context, background, and implications\n- Cover all significant facts, quotes, and developments\n- Provide comprehensive coverage while being more concise than the original\n- Aim for about 50% shorter than the original content`
-      : `Create an abbreviated summary in about ${summaryLength} words.\n\n- Include detailed explanations and context\n- Cover all significant points and supporting details\n- Provide comprehensive coverage while being more concise than the original\n- Aim for about 50% shorter than the original content`;
+      ? `Create a detailed summary of this news article in about ${summaryLength} words.\n\n- Include detailed context, background, and implications\n- Cover all significant facts, quotes, and developments\n- Provide comprehensive coverage with thorough explanations\n- Include supporting details and nuances`
+      : `Create a detailed summary in about ${summaryLength} words.\n\n- Include detailed explanations and context\n- Cover all significant points and supporting details\n- Provide comprehensive coverage with thorough explanations\n- Include supporting details and nuances`;
   }
 
   const newsPrompt = `${summaryTypePrompt}\n\n- Do NOT include or repeat the title/headline.\n- Do NOT include any heading like 'TLDR Summary' or similar.\n- Use markdown formatting for structure: headings, subheadings, bullet points, numbered lists, and short paragraphs.\n- After each heading, list, and paragraph, add a blank line for clear separation and maximum readability.\n- Make the summary visually appealing and easy to scan.`;

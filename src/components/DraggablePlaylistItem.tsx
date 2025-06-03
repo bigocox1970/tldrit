@@ -11,8 +11,8 @@ const getSummaryLevelLabel = (level: number, isEli5: boolean): string => {
   if (isEli5) return 'ELI5';
   
   const labels = {
-    1: 'TLDR',
-    2: 'Abbreviated', 
+    1: 'Short',
+    2: 'Long', 
     3: 'Full'
   };
   

@@ -703,7 +703,7 @@ Examples:
                   max={3}
                   value={summaryLevel}
                   onChange={handleSliderChange}
-                  labels={['TLDR', 'Abbreviated', 'Full']}
+                  labels={['Short', 'Long', 'Full']}
                 />
               </div>
               <div className="inline-flex items-center">
