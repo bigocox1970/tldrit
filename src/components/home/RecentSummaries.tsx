@@ -7,6 +7,19 @@ import Button from '../ui/Button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
+// Helper function to get descriptive summary level label
+const getSummaryLevelLabel = (level: number, isEli5: boolean): string => {
+  if (isEli5) return 'ELI5';
+  
+  const labels = {
+    1: 'TLDR',
+    2: 'Abbreviated', 
+    3: 'Full'
+  };
+  
+  return labels[level as keyof typeof labels] || `Level ${level}`;
+};
+
 const RecentSummaries: React.FC = () => {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuthStore();
@@ -187,7 +200,7 @@ const RecentSummaries: React.FC = () => {
                   {new Date(summaries[displayIndex].createdAt).toLocaleDateString()}
                 </span>
                 <span>
-                  {summaries[displayIndex].isEli5 ? 'ELI5' : `Level ${summaries[displayIndex].summaryLevel}`}
+                  {getSummaryLevelLabel(summaries[displayIndex].summaryLevel, summaries[displayIndex].isEli5)}
                 </span>
               </div>
             </CardContent>

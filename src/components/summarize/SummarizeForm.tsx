@@ -79,7 +79,7 @@ const SummarizeForm: React.FC<SummarizeFormProps> = ({
   const [content, setContent] = useState(initialContent);
   const [file, setFile] = useState<File | null>(null);
   const [isEli5, setIsEli5] = useState(false);
-  const [summaryLevel, setSummaryLevel] = useState(2);
+  const [summaryLevel, setSummaryLevel] = useState(1);
   const [error, setError] = useState('');
   const [showOverlay, setShowOverlay] = useState(false);
   const [regenerateHighlight, setRegenerateHighlight] = useState(false);
@@ -700,10 +700,10 @@ Examples:
                 </label>
                 <Slider
                   min={1}
-                  max={4}
+                  max={3}
                   value={summaryLevel}
                   onChange={handleSliderChange}
-                  labels={['Title + 1 line', 'Short', 'Long', 'Full']}
+                  labels={['TLDR', 'Abbreviated', 'Full']}
                 />
               </div>
               <div className="inline-flex items-center">

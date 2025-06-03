@@ -5,6 +5,19 @@ import { useSummaryStore } from '../../store/summaryStore';
 import { useAuthStore } from '../../store/authStore';
 import Card, { CardContent, CardHeader, CardFooter } from '../ui/Card';
 
+// Helper function to get descriptive summary level label
+const getSummaryLevelLabel = (level: number, isEli5: boolean): string => {
+  if (isEli5) return 'ELI5 Summary';
+  
+  const labels = {
+    1: 'TLDR Summary',
+    2: 'Abbreviated Summary', 
+    3: 'Full Content'
+  };
+  
+  return labels[level as keyof typeof labels] || `Level ${level} Summary`;
+};
+
 const SummaryResult: React.FC = () => {
   const { currentSummary, generateAudioForSummary, isLoading } = useSummaryStore();
   const { isAuthenticated, user } = useAuthStore();
@@ -72,7 +85,7 @@ const SummaryResult: React.FC = () => {
       
       <CardFooter className="border-t border-gray-200 dark:border-gray-700 flex justify-between">
         <div className="text-sm text-gray-500 dark:text-gray-400">
-          {currentSummary.isEli5 ? 'ELI5 Summary' : `Level ${currentSummary.summaryLevel} Summary`}
+          {getSummaryLevelLabel(currentSummary.summaryLevel, currentSummary.isEli5)}
         </div>
         
         <div className="flex space-x-2">

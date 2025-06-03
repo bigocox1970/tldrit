@@ -12,6 +12,19 @@ import { getExampleSummaries, getBookmarkedNewsItems } from '../lib/supabase';
 import { useNewsStore } from '../store/newsStore';
 import UpgradeModal from '../components/ui/UpgradeModal';
 
+// Helper function to get descriptive summary level label
+const getSummaryLevelLabel = (level: number, isEli5: boolean): string => {
+  if (isEli5) return 'ELI5';
+  
+  const labels = {
+    1: 'TLDR',
+    2: 'Abbreviated', 
+    3: 'Full'
+  };
+  
+  return labels[level as keyof typeof labels] || `Level ${level}`;
+};
+
 interface BookmarkedNewsItem {
   id: string;
   title: string;
@@ -769,7 +782,7 @@ const SavedPage: React.FC = () => {
                             {new Date(summary.createdAt).toLocaleDateString()}
                           </span>
                           <span>
-                            {summary.isEli5 ? 'ELI5' : `Level ${summary.summaryLevel}`}
+                            {getSummaryLevelLabel(summary.summaryLevel, summary.isEli5)}
                           </span>
                         </div>
                       </div>

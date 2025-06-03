@@ -6,6 +6,19 @@ import { useAudioStore } from '../store/audioStore';
 import Card, { CardContent } from './ui/Card';
 import Button from './ui/Button';
 
+// Helper function to get descriptive summary level label
+const getSummaryLevelLabel = (level: number, isEli5: boolean): string => {
+  if (isEli5) return 'ELI5';
+  
+  const labels = {
+    1: 'TLDR',
+    2: 'Abbreviated', 
+    3: 'Full'
+  };
+  
+  return labels[level as keyof typeof labels] || `Level ${level}`;
+};
+
 interface PlaylistItem {
   id: string;
   title: string;
@@ -151,7 +164,7 @@ const DraggablePlaylistItem: React.FC<DraggablePlaylistItemProps> = ({
                   {/* Type/Category badge */}
                   <span className="text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
                     {item.type === 'summary' 
-                      ? (item.isEli5 ? 'ELI5' : `Level ${item.summaryLevel}`)
+                      ? getSummaryLevelLabel(item.summaryLevel || 0, item.isEli5 || false)
                       : item.category
                     }
                   </span>

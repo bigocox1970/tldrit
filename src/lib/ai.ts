@@ -75,16 +75,35 @@ function stripMarkdownForTTS(text: string): string {
     .trim();
 }
 
+function getSummaryLengthFromLevel(level: number): number {
+  // Map summary level (1-3) to word count
+  // Level 1: TLDR - short but captures all key points
+  // Level 2: Abbreviated - 50% shorter than full content
+  // Level 3: Full - return original content without summarization
+  const wordCounts = {
+    1: 150,   // TLDR - captures key points concisely
+    2: 400,   // Abbreviated - substantial but condensed
+    3: 0,     // Full - special case, return original content
+  };
+  
+  return wordCounts[level as keyof typeof wordCounts] || 150;
+}
+
 export async function summarizeContent(content: string, options: SummarizeOptions) {
   const { isEli5, summaryLevel, eli5Level, isNewsArticle } = options;
+  
+  // Special case: if summaryLevel is 3 (Full), return the original content
+  if (summaryLevel === 3) {
+    return { summary: content };
+  }
   
   // Select model based on content complexity and user's subscription
   const model = 'gpt-3.5-turbo';
   
-  // Adjust summary length based on slider level (1-5)
+  // Adjust summary length based on slider level (1-2)
   const summaryLength = getSummaryLengthFromLevel(summaryLevel);
   
-  // Create enhanced system message for news articles
+  // Create enhanced system message for different summary types
   const markdownInstructions = `
 - Use markdown for ALL structure.
 - For every list of facts, key points, or steps, use markdown bullet points (lines starting with '- ').
@@ -104,10 +123,21 @@ export async function summarizeContent(content: string, options: SummarizeOption
 ${markdownInstructions}
 ${isEli5 ? `\nYou specialize in explaining complex topics in simple terms that a ${eli5Level || 5}-year-old can understand.` : ''}`;
 
-  // Create enhanced user message for news articles
-  const newsPrompt = isNewsArticle 
-    ? `Create a TLDR summary of the following news article content.\n\n- Do NOT include or repeat the title/headline.\n- Do NOT include any heading like 'TLDR Summary' or similar.\n- Focus on the main facts, events, and key details from the article body.\n- Provide context and insights in about ${summaryLength} words.\n- Use markdown formatting for structure: headings, subheadings, bullet points, numbered lists, and short paragraphs.\n- After each heading, list, and paragraph, add a blank line for clear separation and maximum readability.\n- Make the summary visually appealing and easy to scan.`
-    : `Summarize the following in about ${summaryLength} words:\n\n- Use markdown formatting for structure: headings, subheadings, bullet points, numbered lists, and short paragraphs.\n- After each heading, list, and paragraph, add a blank line for clear separation and maximum readability.\n- Make the summary visually appealing and easy to scan.`;
+  // Create enhanced user message based on summary level
+  let summaryTypePrompt = '';
+  if (summaryLevel === 1) {
+    // TLDR - short but comprehensive key points
+    summaryTypePrompt = isNewsArticle 
+      ? `Create a TLDR summary that captures ALL the key facts, events, and important details from this news article in about ${summaryLength} words.\n\n- Focus on the essential information someone needs to know\n- Include all major facts, figures, and developments\n- Maintain context and significance\n- Be concise but comprehensive - don't miss important details`
+      : `Create a TLDR summary that captures ALL the key points and essential information in about ${summaryLength} words.\n\n- Include all major concepts, facts, and important details\n- Be concise but comprehensive - don't miss important information\n- Focus on what someone really needs to know`;
+  } else if (summaryLevel === 2) {
+    // Abbreviated - about 50% shorter than full content
+    summaryTypePrompt = isNewsArticle 
+      ? `Create an abbreviated summary of this news article in about ${summaryLength} words.\n\n- Include detailed context, background, and implications\n- Cover all significant facts, quotes, and developments\n- Provide comprehensive coverage while being more concise than the original\n- Aim for about 50% shorter than the original content`
+      : `Create an abbreviated summary in about ${summaryLength} words.\n\n- Include detailed explanations and context\n- Cover all significant points and supporting details\n- Provide comprehensive coverage while being more concise than the original\n- Aim for about 50% shorter than the original content`;
+  }
+
+  const newsPrompt = `${summaryTypePrompt}\n\n- Do NOT include or repeat the title/headline.\n- Do NOT include any heading like 'TLDR Summary' or similar.\n- Use markdown formatting for structure: headings, subheadings, bullet points, numbered lists, and short paragraphs.\n- After each heading, list, and paragraph, add a blank line for clear separation and maximum readability.\n- Make the summary visually appealing and easy to scan.`;
   
   // Create user message
   const userMessage = isEli5
@@ -205,19 +235,6 @@ export async function generateAudio(text: string, plan: 'free' | 'pro' | 'premiu
   }
 }
 
-function getSummaryLengthFromLevel(level: number): number {
-  // Map summary level (1-5) to word count
-  const wordCounts = {
-    1: 50,    // Very Short
-    2: 100,   // Short
-    3: 200,   // Medium
-    4: 350,   // Detailed
-    5: 500,   // Comprehensive
-  };
-  
-  return wordCounts[level as keyof typeof wordCounts] || 200;
-}
-
 export async function extractContentFromUrl(url: string) {
   try {
     // Get the current user's session and access token
@@ -313,7 +330,7 @@ export async function summarizeUrl(url: string, tldrOptions?: TLDROptions): Prom
     // Create a TLDR summary using AI with custom options, specifically for news articles
     const summaryOptions: SummarizeOptions = {
       isEli5: tldrOptions?.isEli5 || false,
-      summaryLevel: tldrOptions?.summaryLevel || 2, // Default to short summary for TLDR
+      summaryLevel: tldrOptions?.summaryLevel || 1, // Default to TLDR summary
       eli5Level: tldrOptions?.eli5Level,
       isNewsArticle: true // Flag to indicate this is a news article
     };
