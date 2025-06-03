@@ -13,7 +13,7 @@ interface NewsItemProps {
 }
 
 const NewsItem: React.FC<NewsItemProps> = ({ item }) => {
-  const { generateAudioForNewsItem, tldrLoading, currentlyPlayingId, setCurrentlyPlaying, audioRefs } = useNewsStore();
+  const { generateAudioForNewsItem, tldrLoading, tldrLoadingStatus, currentlyPlayingId, setCurrentlyPlaying, audioRefs } = useNewsStore();
   const { user } = useAuthStore();
   const localStorageKey = `tldr-open-${item.id}`;
   const [showTLDR, setShowTLDR] = useState(() => {
@@ -33,6 +33,7 @@ const NewsItem: React.FC<NewsItemProps> = ({ item }) => {
   const newsItem = useNewsStore(state => state.newsItems.find(i => i.id === item.id)) || item;
 
   const isTLDRLoading = tldrLoading[item.id] || false;
+  const tldrStatus = tldrLoadingStatus[item.id] || '';
 
   const handleSpeakerClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -262,7 +263,7 @@ const NewsItem: React.FC<NewsItemProps> = ({ item }) => {
                     {isTLDRLoading ? (
                       <div className="flex items-center space-x-2">
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                        <span>Generating TLDR summary...</span>
+                        <span>{tldrStatus}</span>
                       </div>
                     ) : tldrText ? (
                       <ReactMarkdown>{tldrText}</ReactMarkdown>

@@ -25,6 +25,7 @@ interface NewsState {
   error: string | null;
   isFetching: boolean;
   tldrLoading: { [newsItemId: string]: boolean };
+  tldrLoadingStatus: { [newsItemId: string]: string };
   currentlyPlayingId: string | null;
   audioRefs: { [id: string]: HTMLAudioElement | null };
   // Listen page specific selection state
@@ -59,6 +60,7 @@ export const useNewsStore = create<NewsState>((set, get) => ({
   error: null,
   isFetching: false,
   tldrLoading: {},
+  tldrLoadingStatus: {},
   currentlyPlayingId: null,
   audioRefs: {},
   selectedListenNewsItems: [],
@@ -351,6 +353,7 @@ export const useNewsStore = create<NewsState>((set, get) => ({
         newsItem.title,
         newsItem.sourceUrl
       );
+      
       // Minimal required fields for audio upsert
       const audioUpsertPayload = {
         url_hash: urlHash,
@@ -361,17 +364,37 @@ export const useNewsStore = create<NewsState>((set, get) => ({
         audio_url: audioUrl,
         published_at: newsItem.publishedAt
       };
+      
       console.log('Upserting audio to Supabase:', audioUpsertPayload);
-      await upsertNewsByUrlHash(audioUpsertPayload);
+      const { data: upsertResult } = await upsertNewsByUrlHash(audioUpsertPayload);
+      
+      // Auto-bookmark when generating audio (Option 1 implementation)
+      let dbId = newsItem.dbId;
+      if (upsertResult) {
+        dbId = upsertResult.id;
+      }
+      
+      // Update local state with audio URL AND bookmark
       set(state => ({
         newsItems: state.newsItems.map(item => 
           item.id === newsItemId 
-            ? { ...item, audioUrl } 
+            ? { ...item, audioUrl, bookmarked: true, dbId } 
             : item
         ),
         isLoading: false,
         error: null,
       }));
+      
+      // Save bookmark to database if we have a database ID
+      if (dbId) {
+        try {
+          await upsertUserNewsMeta(user.id, dbId, { bookmarked: true });
+        } catch (error) {
+          console.error('Error auto-bookmarking after audio generation:', error);
+          // Don't revert audio generation if bookmark fails - audio is more important
+        }
+      }
+      
     } catch {
       set({ 
         error: 'Failed to generate audio', 
@@ -392,11 +415,23 @@ export const useNewsStore = create<NewsState>((set, get) => ({
     const urlHash = urlToHash(newsItem.sourceUrl);
 
     console.log('[TLDR] Checking Supabase for TLDR:', { urlHash, sourceUrl: newsItem.sourceUrl });
+    
+    // Set initial loading state
+    set(state => ({
+      tldrLoading: { ...state.tldrLoading, [newsItemId]: true },
+      tldrLoadingStatus: { ...state.tldrLoadingStatus, [newsItemId]: 'Checking for existing summary...' },
+      error: null
+    }));
+    
     // Always check Supabase for latest TLDR before generating
     const { data: dbNews, error: dbError } = await getNewsByUrlHash(urlHash);
     console.log('[TLDR] Supabase fetch result:', { dbNews, dbError });
     if (dbError) {
-      set({ error: 'Failed to check TLDR in database' });
+      set(state => ({
+        tldrLoading: { ...state.tldrLoading, [newsItemId]: false },
+        tldrLoadingStatus: { ...state.tldrLoadingStatus, [newsItemId]: '' },
+        error: 'Failed to check TLDR in database'
+      }));
       return;
     }
     if (dbNews && dbNews.tldr) {
@@ -407,22 +442,40 @@ export const useNewsStore = create<NewsState>((set, get) => ({
           item.id === newsItemId ? { ...item, tldr: dbNews.tldr } : item
         ),
         tldrLoading: { ...state.tldrLoading, [newsItemId]: false },
+        tldrLoadingStatus: { ...state.tldrLoadingStatus, [newsItemId]: '' },
         error: null,
       }));
       return;
     }
     
-    // Set loading state for this specific item
-    set(state => ({
-      tldrLoading: { ...state.tldrLoading, [newsItemId]: true },
-      error: null
-    }));
-    
     try {
+      // Step 1: Accessing document
+      set(state => ({
+        tldrLoadingStatus: { ...state.tldrLoadingStatus, [newsItemId]: 'Accessing document...' }
+      }));
+      await new Promise(resolve => setTimeout(resolve, 500)); // Brief pause for UX
+      
+      // Step 2: Parsing content
+      set(state => ({
+        tldrLoadingStatus: { ...state.tldrLoadingStatus, [newsItemId]: 'Parsing content...' }
+      }));
+      await new Promise(resolve => setTimeout(resolve, 800)); // Brief pause for UX
+      
+      // Step 3: Generating TLDR
+      set(state => ({
+        tldrLoadingStatus: { ...state.tldrLoadingStatus, [newsItemId]: 'Generating TLDR summary...' }
+      }));
+      
       console.log('[TLDR] Generating TLDR with LLM for:', newsItem.sourceUrl);
       // Use the existing summarizeUrl function from ai.ts with options
-      const tldrSummary = await summarizeUrl(newsItem.sourceUrl, user.isPremium, options);
+      const tldrSummary = await summarizeUrl(newsItem.sourceUrl, options);
       console.log('[TLDR] LLM returned:', tldrSummary);
+      
+      // Step 4: Saving
+      set(state => ({
+        tldrLoadingStatus: { ...state.tldrLoadingStatus, [newsItemId]: 'Saving summary...' }
+      }));
+      
       // Minimal required fields for TLDR upsert
       const tldrUpsertPayload = {
         url_hash: urlHash,
@@ -435,6 +488,7 @@ export const useNewsStore = create<NewsState>((set, get) => ({
       };
       console.log('Upserting TLDR to Supabase:', tldrUpsertPayload);
       const upsertResult = await upsertNewsByUrlHash(tldrUpsertPayload);
+      
       set(state => ({
         newsItems: state.newsItems.map(item => 
           item.id === newsItemId 
@@ -442,8 +496,10 @@ export const useNewsStore = create<NewsState>((set, get) => ({
             : item
         ),
         tldrLoading: { ...state.tldrLoading, [newsItemId]: false },
+        tldrLoadingStatus: { ...state.tldrLoadingStatus, [newsItemId]: '' },
         error: null,
       }));
+      
       // Add to playlist for this user
       if (upsertResult && upsertResult.data && upsertResult.data.id) {
         await upsertUserNewsMeta(user.id, upsertResult.data.id, { in_playlist: true });
@@ -453,6 +509,7 @@ export const useNewsStore = create<NewsState>((set, get) => ({
       console.error('[TLDR] Error generating TLDR:', error);
       set(state => ({
         tldrLoading: { ...state.tldrLoading, [newsItemId]: false },
+        tldrLoadingStatus: { ...state.tldrLoadingStatus, [newsItemId]: '' },
         error: 'Failed to generate TLDR summary'
       }));
     }

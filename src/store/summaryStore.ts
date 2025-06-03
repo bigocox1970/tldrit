@@ -28,6 +28,7 @@ interface SummaryState {
   summaries: Summary[];
   currentSummary: Summary | null;
   isLoading: boolean;
+  loadingStatus: string; // New: Progress messages for main TLDR generation
   error: string | null;
   fetchSummaries: () => Promise<void>;
   createSummary: (request: SummaryRequest) => Promise<void>;
@@ -50,6 +51,7 @@ export const useSummaryStore = create<SummaryState>((set, get) => ({
   summaries: [],
   currentSummary: null,
   isLoading: false,
+  loadingStatus: '',
   error: null,
   selectedSummaries: [],
   isEditMode: false,
@@ -111,7 +113,7 @@ export const useSummaryStore = create<SummaryState>((set, get) => ({
       return;
     }
     
-    set({ isLoading: true, error: null });
+    set({ isLoading: true, error: null, loadingStatus: 'Preparing content...' });
     
     try {
       // Process the content based on its type
@@ -119,26 +121,39 @@ export const useSummaryStore = create<SummaryState>((set, get) => ({
       let originalContentKey = '';
       
       if (request.contentType === 'text') {
+        set({ loadingStatus: 'Processing text input...' });
         processedContent = request.content as string;
         originalContentKey = request.content as string;
       } else if (request.contentType === 'url') {
+        set({ loadingStatus: 'Accessing webpage...' });
         console.log('[summaryStore] Calling extractContentFromUrl with:', request.content);
+        await new Promise(resolve => setTimeout(resolve, 500)); // Brief pause for UX
+        
+        set({ loadingStatus: 'Extracting content from webpage...' });
         processedContent = await extractContentFromUrl(request.content as string);
         console.log('[summaryStore] extractContentFromUrl returned:', processedContent);
         originalContentKey = request.content as string; // Use the input URL as the key
       } else if (request.contentType === 'file') {
+        set({ loadingStatus: 'Reading uploaded file...' });
         console.log('[summaryStore] Processing file:', (request.content as File).name);
+        await new Promise(resolve => setTimeout(resolve, 600)); // Brief pause for UX
+        
+        set({ loadingStatus: 'Parsing document content...' });
         processedContent = await processFileContent(request.content as File);
         console.log('[summaryStore] File processing returned:', processedContent.substring(0, 100) + '...');
         originalContentKey = (request.content as File).name;
       }
       
       // Generate the summary
+      set({ loadingStatus: 'Analyzing content and generating summary...' });
       const summaryResult = await summarizeContent(processedContent, {
         isEli5: request.isEli5,
         summaryLevel: request.summaryLevel,
         eli5Level: request.eli5Level,
       });
+      
+      set({ loadingStatus: 'Preparing your summary...' });
+      await new Promise(resolve => setTimeout(resolve, 300)); // Brief pause for UX
       
       // Extract a title from the content
       const title = generateTitleFromContent(processedContent);
@@ -178,12 +193,14 @@ export const useSummaryStore = create<SummaryState>((set, get) => ({
         summaries: [formattedSummary, ...state.summaries],
         currentSummary: formattedSummary,
         isLoading: false, 
+        loadingStatus: '',
         error: null 
       }));
     } catch {
       set({ 
         error: 'Failed to create summary', 
-        isLoading: false 
+        isLoading: false,
+        loadingStatus: ''
       });
     }
   },

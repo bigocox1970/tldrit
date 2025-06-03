@@ -23,7 +23,7 @@ const SummarizeForm: React.FC<SummarizeFormProps> = ({
   autoStart = false,
   fileType = false
 }) => {
-  const { createSummary, currentSummary, isLoading, summaries, generateAudioForSummary } = useSummaryStore();
+  const { createSummary, currentSummary, isLoading, summaries, generateAudioForSummary, loadingStatus } = useSummaryStore();
   const { isAuthenticated, user } = useAuthStore();
   const { currentlyPlaying, isPlaying, toggleAudio } = useAudioStore();
   
@@ -552,7 +552,7 @@ Paste your, meeting notes, revision, or any long boring document here to TLDRit!
               fullWidth
               disabled={isLoading || (!content && !file)}
             >
-              {isLoading ? 'Summarizing...' : 'TL;DR it!'}
+              {isLoading ? (loadingStatus || 'Summarizing...') : 'TL;DR it!'}
             </Button>
           </form>
         </CardContent>
@@ -640,7 +640,10 @@ Paste your, meeting notes, revision, or any long boring document here to TLDRit!
                 </div>
               ) : (
                 <div className="flex items-center justify-center h-40 text-lg text-gray-500">
-                  Generating summary...
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-3"></div>
+                    <p>{loadingStatus || 'Generating summary...'}</p>
+                  </div>
                 </div>
               )}
             </div>
@@ -677,7 +680,7 @@ Paste your, meeting notes, revision, or any long boring document here to TLDRit!
                   disabled={isLoading}
                   className={regenerateHighlight ? 'animate-pulse ring-2 ring-blue-400' : ''}
                 >
-                  {isLoading ? 'Regenerating...' : 'Regenerate'}
+                  {isLoading ? (loadingStatus || 'Regenerating...') : 'Regenerate'}
                 </Button>
               </div>
             </div>
