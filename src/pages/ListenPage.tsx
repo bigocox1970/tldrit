@@ -9,6 +9,7 @@ import Card, { CardContent } from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import StickyMediaPlayer from '../components/StickyMediaPlayer';
 import DraggablePlaylistItem from '../components/DraggablePlaylistItem';
+import UpgradeModal from '../components/ui/UpgradeModal';
 import { getExampleSummaries, getPlaylistNewsItems, getExampleNewsItems } from '../lib/supabase';
 import { Summary } from '../types';
 import { Headphones, CheckSquare, Square, Play, Volume2, ChevronDown, FileText } from 'lucide-react';
@@ -86,6 +87,9 @@ const ListenPage: React.FC = () => {
   // Expansion state for non-authenticated users
   const [selectedSummary, setSelectedSummary] = useState<string | null>(null);
   const [selectedNewsItem, setSelectedNewsItem] = useState<string | null>(null);
+
+  // Upgrade modal state for non-authenticated users
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   // Playlist order state
   const [playlistOrder, setPlaylistOrder] = useState<string[]>([]);
@@ -491,6 +495,28 @@ const ListenPage: React.FC = () => {
 
     return (
       <div className="pb-32 md:pb-20">
+        {/* Header with item count and disabled Play All button */}
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+              Example Playlist
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              {exampleSummaries.length + exampleNews.length} items
+            </p>
+          </div>
+          
+          {/* Disabled Play All Button */}
+          <Button
+            variant="secondary"
+            onClick={() => setShowUpgradeModal(true)}
+            className="flex items-center gap-2 opacity-60 cursor-pointer hover:opacity-80 transition-opacity"
+          >
+            <Play size={16} />
+            Play All
+          </Button>
+        </div>
+
         <div className="space-y-3">
           {/* Example Summaries */}
           {exampleSummaries.map((summary) => (
@@ -698,6 +724,15 @@ const ListenPage: React.FC = () => {
             </Card>
           ))}
         </div>
+
+        {/* Upgrade Modal */}
+        {showUpgradeModal && (
+          <UpgradeModal
+            isOpen={showUpgradeModal}
+            onClose={() => setShowUpgradeModal(false)}
+            feature="Play All functionality"
+          />
+        )}
       </div>
     );
   }
