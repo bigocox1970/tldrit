@@ -7,19 +7,35 @@ import { useAuthStore } from '../../store/authStore';
 const Layout: React.FC = () => {
   const { checkAuthState } = useAuthStore();
   const [isDarkMode, setIsDarkMode] = useState(() => {
-    // Check localStorage first
-    const stored = localStorage.getItem('darkMode');
-    return stored === 'true';
+    // Check localStorage for theme preference
+    let storedTheme = localStorage.getItem('theme');
+    
+    // Migration: If no 'theme' but has old 'darkMode', migrate it
+    if (!storedTheme) {
+      const oldDarkMode = localStorage.getItem('darkMode');
+      if (oldDarkMode !== null) {
+        storedTheme = oldDarkMode === 'true' ? 'dark' : 'light';
+        localStorage.setItem('theme', storedTheme);
+        localStorage.removeItem('darkMode'); // Clean up old key
+      }
+    }
+    
+    // Default to dark mode if no preference is set
+    if (!storedTheme) {
+      return true; // Default to dark mode
+    }
+    return storedTheme === 'dark';
   });
   
   // Handle dark mode changes
   useEffect(() => {
     if (isDarkMode) {
       document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
     } else {
       document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
     }
-    localStorage.setItem('darkMode', String(isDarkMode));
   }, [isDarkMode]);
   
   // Check auth state on mount
