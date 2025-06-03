@@ -9,7 +9,7 @@ interface AuthState {
   error: string | null;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string) => Promise<{ success: boolean; message?: string } | void>;
   logout: () => Promise<void>;
   checkAuthState: () => Promise<void>;
 }
@@ -61,15 +61,15 @@ export const useAuthStore = create<AuthState>()(
           }
           
           if (data?.user) {
-            // Auto-login after successful registration
-            await signIn(email, password);
-            const { user } = await getCurrentUser();
+            // Don't auto-login - require email confirmation first
             set({ 
-              user: user ? { ...user, email: user.email || '' } : null, 
-              isAuthenticated: true, 
+              user: null,
+              isAuthenticated: false, 
               isLoading: false, 
               error: null 
             });
+            // Success - user needs to check email
+            return { success: true, message: 'Please check your email to confirm your account before signing in.' };
           }
         } catch {
           set({ 

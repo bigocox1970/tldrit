@@ -1,21 +1,22 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 
 const RegisterForm: React.FC = () => {
-  const navigate = useNavigate();
   const { register, isLoading, error } = useAuthStore();
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [formError, setFormError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError('');
+    setSuccessMessage('');
     
     if (!email || !password || !confirmPassword) {
       setFormError('All fields are required');
@@ -33,9 +34,15 @@ const RegisterForm: React.FC = () => {
     }
     
     try {
-      await register(email, password);
-      navigate('/');
-    } catch (err) {
+      const result = await register(email, password);
+      if (result?.success) {
+        setSuccessMessage(result.message || 'Registration successful! Please check your email.');
+        // Clear form
+        setEmail('');
+        setPassword('');
+        setConfirmPassword('');
+      }
+    } catch {
       setFormError('An error occurred during registration');
     }
   };
@@ -48,6 +55,24 @@ const RegisterForm: React.FC = () => {
         {(error || formError) && (
           <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg">
             {error || formError}
+          </div>
+        )}
+        
+        {successMessage && (
+          <div className="mb-4 p-4 bg-green-100 text-green-700 rounded-lg">
+            <div className="flex items-center">
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+              </svg>
+              <span className="font-medium">{successMessage}</span>
+            </div>
+            <p className="mt-2 text-sm">
+              You can now{' '}
+              <Link to="/login" className="underline font-medium">
+                sign in
+              </Link>
+              {' '}once you've confirmed your email.
+            </p>
           </div>
         )}
         

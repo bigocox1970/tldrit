@@ -14,6 +14,7 @@ import ListenPage from './pages/ListenPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ProfilePage from './pages/ProfilePage';
+import AuthCallbackPage from './pages/AuthCallbackPage';
 import PricingPlans from './components/subscription/PricingPlans';
 import TermsPage from './pages/terms';
 import PWAInstallGuide from './pages/PWAInstallGuide';
@@ -43,6 +44,7 @@ function App() {
   return (
     <Router>
       <Routes>
+        <Route path="/auth/callback" element={<AuthCallbackPage />} />
         <Route element={<Layout />}>
           <Route index element={<HomePage />} />
           <Route path="summarize" element={<SummarizePage />} />
