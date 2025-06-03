@@ -231,10 +231,46 @@ export async function extractContentFromUrl(url: string) {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await axios.post('/api/extract-url', { url }, { headers });
+    // Create a timeout promise that rejects after 45 seconds
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error('Unable to extract content from this domain. This may be due to:\n\n• The website has complex security or structure\n• The site may block automated access\n• Network connectivity issues\n\n💡 Try one of these alternatives:\n• Copy and paste the content directly\n• Try a different website or article\n• Use a direct link to the article content'));
+      }, 45000); // 45 second timeout
+    });
+
+    // Create the actual request promise
+    const requestPromise = axios.post('/api/extract-url', { url }, { 
+      headers,
+      timeout: 40000 // Axios timeout slightly less than our custom timeout
+    });
+
+    // Race between the request and timeout
+    const response = await Promise.race([requestPromise, timeoutPromise]);
+    
     return response.data.content;
   } catch (error) {
     console.error('Error extracting content from URL:', error);
+    
+    // Check if it's our custom timeout error
+    if (error instanceof Error && error.message.includes('Unable to extract content from this domain')) {
+      throw error; // Re-throw our custom timeout message
+    }
+    
+    // Check for axios timeout
+    if (axios.isAxiosError(error) && (error.code === 'ECONNABORTED' || error.message.includes('timeout'))) {
+      throw new Error('Unable to extract content from this domain. This may be due to:\n\n• The website has complex security or structure\n• The site may block automated access\n• Network connectivity issues\n\n💡 Try one of these alternatives:\n• Copy and paste the content directly\n• Try a different website or article\n• Use a direct link to the article content');
+    }
+    
+    // Check for other network errors
+    if (axios.isAxiosError(error)) {
+      if (error.response && (error.response.status === 403 || error.response.status === 429)) {
+        throw new Error('Unable to extract content from this domain. The website may be blocking automated access.\n\n💡 Try one of these alternatives:\n• Copy and paste the content directly\n• Try a different website or article');
+      }
+      if (error.response && error.response.status >= 500) {
+        throw new Error('Unable to extract content from this domain due to server issues.\n\n💡 Try one of these alternatives:\n• Copy and paste the content directly\n• Try again in a few minutes\n• Use a different website or article');
+      }
+    }
+    
     throw new Error('Failed to extract content from URL');
   }
 }
