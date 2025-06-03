@@ -46,7 +46,7 @@ exports.handler = async function(event, context) {
         'Connection': 'keep-alive',
         'Upgrade-Insecure-Requests': '1',
       },
-      timeout: 15000, // 15 second timeout
+      timeout: 30000, // 30 second timeout (increased from 15s)
       redirect: 'follow', // Follow redirects
     });
 
