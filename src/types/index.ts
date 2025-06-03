@@ -4,6 +4,7 @@ export interface User {
   isPremium: boolean;
   interests: string[];
   eli5Age?: number;
+  plan: 'free' | 'pro' | 'premium';
 }
 
 export interface Summary {

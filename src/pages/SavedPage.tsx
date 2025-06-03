@@ -207,8 +207,8 @@ const SavedPage: React.FC = () => {
   const handleSpeakerClick = async (summary: Summary, e: React.MouseEvent) => {
     e.stopPropagation();
     
-    // Check if user is on free plan
-    if (!user?.isPremium) {
+    // Check if user has access to TTS
+    if (user?.plan === 'free') {
       setShowUpgradeModal(true);
       return;
     }
@@ -224,10 +224,13 @@ const SavedPage: React.FC = () => {
         // After generating, the summary store will update and we can try playing
         // We'll need to refetch to get the updated audioUrl
         await fetchSummaries();
-      } catch (err: unknown) {
-        let message = 'Failed to generate audio.';
-        if (err instanceof Error) message = err.message;
-        console.log('TTS error:', message);
+      } catch (error) {
+        console.error('Error generating audio:', error);
+        // Show error modal for character limit
+        if (error instanceof Error && error.message.includes('700 characters')) {
+          setNoAudioItemType('TLDR');
+          setShowNoAudioModal(true);
+        }
       } finally {
         setAudioLoading(prev => ({ ...prev, [summary.id]: false }));
       }
@@ -251,7 +254,7 @@ const SavedPage: React.FC = () => {
         const audioText = newsItem.tldr || newsItem.summary;
         const audioUrl = await generateAudio(
           audioText, 
-          user?.isPremium || false, 
+          user?.plan || 'free', 
           'news', 
           newsItem.title,
           newsItem.sourceUrl
@@ -282,10 +285,13 @@ const SavedPage: React.FC = () => {
         
         // Auto-play the generated audio
         toggleAudio(newsItem.id, audioUrl);
-      } catch (err: unknown) {
-        let message = 'Failed to generate audio.';
-        if (err instanceof Error) message = err.message;
-        console.log('TTS error:', message);
+      } catch (error) {
+        console.error('Error generating audio:', error);
+        // Show error modal for character limit
+        if (error instanceof Error && error.message.includes('700 characters')) {
+          setNoAudioItemType('news');
+          setShowNoAudioModal(true);
+        }
       } finally {
         setNewsAudioLoading(prev => ({ ...prev, [newsItem.id]: false }));
       }

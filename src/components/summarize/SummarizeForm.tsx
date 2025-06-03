@@ -354,8 +354,8 @@ const SummarizeForm: React.FC<SummarizeFormProps> = ({
     e.stopPropagation();
     if (!currentSummary) return;
 
-    // Check if user is on free plan
-    if (!user?.isPremium) {
+    // Check if user has access to TTS
+    if (user?.plan === 'free') {
       setShowUpgradeModal(true);
       return;
     }
@@ -368,10 +368,12 @@ const SummarizeForm: React.FC<SummarizeFormProps> = ({
       setAudioLoading(true);
       try {
         await generateAudioForSummary(currentSummary.id);
-      } catch (err: unknown) {
-        let message = 'Failed to generate audio.';
-        if (err instanceof Error) message = err.message;
-        setError(message);
+      } catch (error) {
+        console.error('Error generating audio:', error);
+        // Show error modal for character limit
+        if (error instanceof Error && error.message.includes('700 characters')) {
+          setError('Audio is only available for summaries up to 700 characters on the free plan. Upgrade to Pro for longer audio.');
+        }
       } finally {
         setAudioLoading(false);
       }

@@ -346,7 +346,7 @@ export const useNewsStore = create<NewsState>((set, get) => ({
       const audioText = newsItem.tldr || newsItem.summary;
       const audioUrl = await generateAudio(
         audioText, 
-        user.isPremium, 
+        user.plan || 'free', 
         'news', 
         newsItem.title,
         newsItem.sourceUrl

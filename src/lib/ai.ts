@@ -26,20 +26,20 @@ import axios from 'axios';
 import { supabase } from './supabase';
 
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
-const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
 interface SummarizeOptions {
-  isPremium: boolean;
   isEli5: boolean;
   summaryLevel: number;
   eli5Level?: number;
   isNewsArticle?: boolean;
 }
 
-interface TLDROptions {
-  summaryLevel?: number;
+export interface TLDROptions {
   isEli5?: boolean;
+  summaryLevel?: number;
   eli5Level?: number;
+  isNewsArticle?: boolean;
+  hasPaidPlan?: boolean;
 }
 
 function getEliPrompt(age: number) {
@@ -76,16 +76,10 @@ function stripMarkdownForTTS(text: string): string {
 }
 
 export async function summarizeContent(content: string, options: SummarizeOptions) {
-  const { isPremium, isEli5, summaryLevel, eli5Level, isNewsArticle } = options;
-  
-  // Determine which API to use based on content length and user's subscription
-  const useOpenRouter = isPremium && content.length > 1000;
-  const apiUrl = useOpenRouter ? OPENROUTER_API_URL : OPENAI_API_URL;
+  const { isEli5, summaryLevel, eli5Level, isNewsArticle } = options;
   
   // Select model based on content complexity and user's subscription
-  const model = useOpenRouter 
-    ? 'anthropic/claude-3-opus'
-    : 'gpt-3.5-turbo';
+  const model = 'gpt-3.5-turbo';
   
   // Adjust summary length based on slider level (1-5)
   const summaryLength = getSummaryLengthFromLevel(summaryLevel);
@@ -105,36 +99,11 @@ export async function summarizeContent(content: string, options: SummarizeOption
 - Do NOT include any heading like 'TLDR Summary' or similar in your output.
 - Make the summary easy to scan and visually appealing.`;
 
-  const newsSpecificInstructions = isNewsArticle 
-    ? `EXAMPLE MARKDOWN OUTPUT (copy this structure):
-
-## Key Points from the Article
-
-- Salesforce acquired Informatica for $8 billion.
-
-- The acquisition aims to bolster Salesforce's capabilities in enterprise data management and artificial intelligence (AI).
-
-- Informatica's expertise in data integration and data governance will enhance Salesforce's offerings.
-
-## Implications and Insights
-
-- Salesforce's acquisition of Informatica signifies a strategic move to strengthen its position in the competitive landscape of enterprise data and AI.
-
-- This acquisition highlights the increasing focus on leveraging data effectively to enhance customer relationships and drive business growth.
-
----
-
-You are creating a TLDR summary for a news article.
-
-${markdownInstructions}`
-    : `You are an expert at creating concise, accurate summaries while preserving key information. Focus on main points and maintain the original tone.\n${markdownInstructions}`;
-  
   // Create system message
-  const explicitEliPrompt = isEli5 ? `${getEliPrompt(eli5Level || 5)} The higher the age, the more advanced and detailed the explanation should be.` : '';
-  const systemMessage = isEli5
-    ? `You are an expert at explaining complex topics. ${explicitEliPrompt} Keep explanations clear, engaging, and use simple analogies when helpful. ${newsSpecificInstructions}`
-    : newsSpecificInstructions;
-  
+  const systemMessage = `You are a professional summarizer who creates clear, concise, and accurate summaries.
+${markdownInstructions}
+${isEli5 ? `\nYou specialize in explaining complex topics in simple terms that a ${eli5Level || 5}-year-old can understand.` : ''}`;
+
   // Create enhanced user message for news articles
   const newsPrompt = isNewsArticle 
     ? `Create a TLDR summary of the following news article content.\n\n- Do NOT include or repeat the title/headline.\n- Do NOT include any heading like 'TLDR Summary' or similar.\n- Focus on the main facts, events, and key details from the article body.\n- Provide context and insights in about ${summaryLength} words.\n- Use markdown formatting for structure: headings, subheadings, bullet points, numbered lists, and short paragraphs.\n- After each heading, list, and paragraph, add a blank line for clear separation and maximum readability.\n- Make the summary visually appealing and easy to scan.`
@@ -150,14 +119,12 @@ ${markdownInstructions}`
       'Content-Type': 'application/json',
     };
 
-    if (useOpenRouter) {
-      headers['Authorization'] = `Bearer ${import.meta.env.VITE_OPENROUTER_API_KEY}`;
-      headers['HTTP-Referer'] = window.location.origin;
-    } else {
-      headers['Authorization'] = `Bearer ${import.meta.env.VITE_OPENAI_API_KEY}`;
+    if (!import.meta.env.VITE_OPENAI_API_KEY) {
+      throw new Error('OpenAI API key not configured');
     }
+    headers['Authorization'] = `Bearer ${import.meta.env.VITE_OPENAI_API_KEY}`;
 
-    const response = await axios.post(apiUrl, {
+    const response = await axios.post(OPENAI_API_URL, {
       model,
       messages: [
         { role: 'system', content: systemMessage },
@@ -167,18 +134,25 @@ ${markdownInstructions}`
       max_tokens: summaryLength * 4, // Approximate tokens needed
     }, { headers });
 
-    const summary = useOpenRouter
-      ? response.data.choices[0].message.content
-      : response.data.choices[0].message.content;
+    if (!response.data?.choices?.[0]?.message?.content) {
+      throw new Error('Invalid response from AI service');
+    }
 
+    const summary = response.data.choices[0].message.content;
     return { summary };
   } catch (error) {
     console.error('Error summarizing content:', error);
+    if (axios.isAxiosError(error)) {
+      if (error.response?.status === 429) {
+        throw new Error('Rate limit exceeded. Please try again in a moment.');
+      }
+      throw new Error(`AI service error: ${error.response?.data?.error?.message || error.message}`);
+    }
     throw new Error('Failed to generate summary');
   }
 }
 
-export async function generateAudio(text: string, isPremium: boolean, type?: 'news' | 'user', title?: string, sourceUrl?: string) {
+export async function generateAudio(text: string, plan: 'free' | 'pro' | 'premium', type?: 'news' | 'user', title?: string, sourceUrl?: string) {
   // Get the current user's session and access token
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
@@ -198,12 +172,12 @@ export async function generateAudio(text: string, isPremium: boolean, type?: 'ne
   try {
     const requestBody: {
       text: string;
-      isPremium: boolean;
+      plan: 'free' | 'pro' | 'premium';
       type?: 'news' | 'user';
       sourceUrl?: string;
     } = {
       text: audioText,
-      isPremium,
+      plan,
       type,
     };
 
@@ -291,7 +265,7 @@ export async function processFileContent(file: File) {
 }
 
 // TLDR function for news articles - extracts content from URL and creates a concise summary
-export async function summarizeUrl(url: string, isPremium: boolean = false, tldrOptions?: TLDROptions): Promise<string> {
+export async function summarizeUrl(url: string, tldrOptions?: TLDROptions): Promise<string> {
   try {
     // First extract content from the URL
     const content = await extractContentFromUrl(url);
@@ -302,7 +276,6 @@ export async function summarizeUrl(url: string, isPremium: boolean = false, tldr
 
     // Create a TLDR summary using AI with custom options, specifically for news articles
     const summaryOptions: SummarizeOptions = {
-      isPremium,
       isEli5: tldrOptions?.isEli5 || false,
       summaryLevel: tldrOptions?.summaryLevel || 2, // Default to short summary for TLDR
       eli5Level: tldrOptions?.eli5Level,
@@ -310,9 +283,15 @@ export async function summarizeUrl(url: string, isPremium: boolean = false, tldr
     };
 
     const result = await summarizeContent(content, summaryOptions);
+    if (!result || !result.summary) {
+      throw new Error('Failed to generate summary from content');
+    }
     return result.summary;
   } catch (error) {
     console.error('Error creating TLDR summary:', error);
-    throw new Error('Failed to create TLDR summary');
+    // Rethrow the error with a more specific message
+    throw error instanceof Error 
+      ? error 
+      : new Error('Failed to create TLDR summary');
   }
 }

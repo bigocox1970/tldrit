@@ -106,25 +106,13 @@ export const useSummaryStore = create<SummaryState>((set, get) => ({
   
   createSummary: async (request: SummaryRequest) => {
     const user = useAuthStore.getState().user;
-    if (!user) return;
-    
-    // Enforce 10 TLDRs per month for free users
-    if (!user.isPremium) {
-      // Count summaries created this month
-      const now = new Date();
-      const currentMonth = now.getMonth();
-      const currentYear = now.getFullYear();
-      const summariesThisMonth = get().summaries.filter(s => {
-        const created = new Date(s.createdAt);
-        return created.getMonth() === currentMonth && created.getFullYear() === currentYear;
-      });
-      if (summariesThisMonth.length >= 10) {
-        set({ error: 'Free accounts are limited to 10 TLDRs per month. Upgrade to Pro for unlimited summaries.' });
-        return;
-      }
+    if (!user) {
+      set({ error: 'User must be logged in', isLoading: false });
+      return;
     }
     
     set({ isLoading: true, error: null });
+    
     try {
       // Process the content based on its type
       let processedContent = '';
@@ -147,9 +135,9 @@ export const useSummaryStore = create<SummaryState>((set, get) => ({
       
       // Generate the summary
       const summaryResult = await summarizeContent(processedContent, {
-        isPremium: user.isPremium,
         isEli5: request.isEli5,
         summaryLevel: request.summaryLevel,
+        eli5Level: request.eli5Level,
       });
       
       // Extract a title from the content
@@ -211,7 +199,7 @@ export const useSummaryStore = create<SummaryState>((set, get) => ({
     try {
       const audioUrl = await generateAudio(
         summary.summary, 
-        user.isPremium, 
+        user.plan || 'free', 
         'user', 
         summary.title
       );

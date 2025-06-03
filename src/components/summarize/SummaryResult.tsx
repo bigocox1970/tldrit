@@ -78,7 +78,7 @@ const SummaryResult: React.FC = () => {
         <div className="flex space-x-2">
           <button
             onClick={handleHeadphonesClick}
-            disabled={audioLoading || isLoading || !isAuthenticated || (!user?.isPremium && currentSummary.summary.length > 300)}
+            disabled={audioLoading || isLoading || !isAuthenticated || (user?.plan === 'free' && currentSummary.summary.length > 300)}
             className={`p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${audioLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
             title={currentSummary.audioUrl ? (audioPlaying ? 'Pause audio' : 'Play audio') : (audioLoading ? 'Generating audio...' : 'Generate and play audio')}
           >

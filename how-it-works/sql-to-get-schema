@@ -1,51 +1,67 @@
-DO $$ 
-DECLARE 
-    r RECORD;
-    col RECORD;
-    pol RECORD;
-    md TEXT := '';
-BEGIN
-    -- Loop through all user tables in the public schema
-    FOR r IN 
-        SELECT table_name 
-        FROM information_schema.tables 
-        WHERE table_schema = 'public' 
-          AND table_type = 'BASE TABLE'
-    LOOP
-        md := md || '## Table: `' || r.table_name || '`' || E'\n\n';
-        md := md || '| Column | Data Type | Nullable |' || E'\n';
-        md := md || '|--------|-----------|----------|' || E'\n';
+-- Get all tables and their columns
+SELECT 
+    t.table_name,
+    array_agg(
+        c.column_name || ' ' || 
+        c.data_type || 
+        CASE 
+            WHEN c.character_maximum_length IS NOT NULL 
+            THEN '(' || c.character_maximum_length || ')'
+            ELSE ''
+        END || 
+        CASE 
+            WHEN c.is_nullable = 'NO' THEN ' NOT NULL'
+            ELSE ''
+        END || 
+        CASE 
+            WHEN col_description((t.table_schema || '.' || t.table_name)::regclass::oid, c.ordinal_position) IS NOT NULL 
+            THEN ' -- ' || col_description((t.table_schema || '.' || t.table_name)::regclass::oid, c.ordinal_position)
+            ELSE ''
+        END
+    ) as columns,
+    obj_description((t.table_schema || '.' || t.table_name)::regclass::oid, 'pg_class') as table_description
+FROM information_schema.tables t
+LEFT JOIN information_schema.columns c 
+    ON c.table_schema = t.table_schema 
+    AND c.table_name = t.table_name
+WHERE t.table_schema = 'public'
+    AND t.table_type = 'BASE TABLE'
+GROUP BY t.table_schema, t.table_name;
 
-        -- Get all columns
-        FOR col IN 
-            SELECT column_name, data_type, is_nullable
-            FROM information_schema.columns
-            WHERE table_name = r.table_name 
-              AND table_schema = 'public'
-        LOOP
-            md := md || '| `' || col.column_name || '` | `' || col.data_type || '` | `' || col.is_nullable || '` |' || E'\n';
-        END LOOP;
+-- Get all indexes
+SELECT
+    tablename as table_name,
+    indexname as index_name,
+    indexdef as index_definition
+FROM pg_indexes
+WHERE schemaname = 'public'
+ORDER BY tablename, indexname;
 
-        -- Add RLS policies if any
-        md := md || E'\n**Row-Level Security Policies**:\n\n';
+-- Get all foreign key constraints
+SELECT
+    tc.table_name, 
+    kcu.column_name,
+    ccu.table_name AS foreign_table_name,
+    ccu.column_name AS foreign_column_name
+FROM information_schema.table_constraints AS tc 
+JOIN information_schema.key_column_usage AS kcu
+    ON tc.constraint_name = kcu.constraint_name
+    AND tc.table_schema = kcu.table_schema
+JOIN information_schema.constraint_column_usage AS ccu
+    ON ccu.constraint_name = tc.constraint_name
+    AND ccu.table_schema = tc.table_schema
+WHERE tc.constraint_type = 'FOREIGN KEY'
+    AND tc.table_schema = 'public';
 
-        FOR pol IN 
-            SELECT pol.policyname, pol.permissive, pol.cmd, pol.roles, pg_get_expr(pol.qual, pol.polrelid) AS condition, pg_get_expr(pol.with_check, pol.polrelid) AS check_expr
-            FROM pg_policies pol
-            WHERE pol.schemaname = 'public' 
-              AND pol.tablename = r.table_name
-        LOOP
-            md := md || '- `' || pol.policyname || '` on `' || UPPER(pol.cmd) || '` for roles `' || array_to_string(pol.roles, ', ') || '`' || E'\n';
-            IF pol.condition IS NOT NULL THEN
-                md := md || '  - Condition: `' || pol.condition || '`' || E'\n';
-            END IF;
-            IF pol.check_expr IS NOT NULL THEN
-                md := md || '  - With Check: `' || pol.check_expr || '`' || E'\n';
-            END IF;
-        END LOOP;
-
-        md := md || E'\n---\n\n';
-    END LOOP;
-
-    RAISE NOTICE '%', md;
-END $$;
+-- Get RLS policies
+SELECT 
+    schemaname,
+    tablename,
+    policyname,
+    permissive,
+    roles,
+    cmd,
+    qual,
+    with_check
+FROM pg_policies
+WHERE schemaname = 'public';
