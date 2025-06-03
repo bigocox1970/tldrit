@@ -8,15 +8,15 @@ import Button from './ui/Button';
 
 // Helper function to get descriptive summary level label
 const getSummaryLevelLabel = (level: number, isEli5: boolean): string => {
-  if (isEli5) return 'ELI5';
+  if (isEli5) return 'ELI5 TLDR';
   
   const labels = {
-    1: 'Short',
-    2: 'Long', 
-    3: 'Full'
+    1: 'Short TLDR',
+    2: 'Long TLDR', 
+    3: 'Full TLDR'
   };
   
-  return labels[level as keyof typeof labels] || `Level ${level}`;
+  return labels[level as keyof typeof labels] || `Level ${level} TLDR`;
 };
 
 interface PlaylistItem {
@@ -72,7 +72,11 @@ const DraggablePlaylistItem: React.FC<DraggablePlaylistItemProps> = ({
     } else if (onTrackJump && item.audioUrl) {
       // Jump to this track if not in edit mode and has audio
       onTrackJump(item.id);
+    } else if (onNavigateToSource && !onTrackJump) {
+      // Navigate to source if no track jump function provided (for example content)
+      onNavigateToSource();
     }
+    // If none of the above conditions are met, do nothing (allows for normal expansion)
   };
 
   const handlePlayClick = (e: React.MouseEvent) => {
@@ -98,7 +102,7 @@ const DraggablePlaylistItem: React.FC<DraggablePlaylistItemProps> = ({
             ? 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-900/20' 
             : ''
         } ${isDragging ? 'shadow-lg' : ''} ${
-          !isEditMode && item.audioUrl ? 'hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer' : 'cursor-default'
+          !isEditMode && (item.audioUrl || (onNavigateToSource && !onTrackJump)) ? 'hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer' : 'cursor-default'
         }`}
         onClick={handleItemClick}
       >
@@ -165,7 +169,7 @@ const DraggablePlaylistItem: React.FC<DraggablePlaylistItemProps> = ({
                   <span className="text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
                     {item.type === 'summary' 
                       ? getSummaryLevelLabel(item.summaryLevel || 0, item.isEli5 || false)
-                      : item.category
+                      : 'News TLDR'
                     }
                   </span>
                 </div>
@@ -212,17 +216,17 @@ const DraggablePlaylistItem: React.FC<DraggablePlaylistItemProps> = ({
               )}
               
               {/* No audio message with action */}
-              {!item.audioUrl && (
+              {!item.audioUrl && onNavigateToSource && (
                 <div className="mt-2">
                   <Button
                     variant="secondary"
                     size="sm"
                     onClick={() => {
-                      if (onNavigateToSource) onNavigateToSource();
+                      onNavigateToSource();
                     }}
                     className="text-xs py-1 px-2 h-6"
                   >
-                    Generate Audio
+                    View Details
                   </Button>
                 </div>
               )}

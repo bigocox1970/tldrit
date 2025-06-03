@@ -531,10 +531,7 @@ const SummarizeForm: React.FC<SummarizeFormProps> = ({
 🌐 URLs: Any webpage (we'll extract the content)
 📄 Files: Drop files below
 
-Examples:
-• google.com
-• www.example.com  
-• https://news.ycombinator.com
+Any URL type: example.com, www.example.com, https://example.com
 • Your long meeting transcript
 • Research paper content`}
                 disabled={!!file} // Disable when file is selected

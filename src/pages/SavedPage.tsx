@@ -8,21 +8,21 @@ import Button from '../components/ui/Button';
 import ReactMarkdown from 'react-markdown';
 import { Volume2, Copy, Check, CheckSquare, Square, ChevronDown, Save, FileText, Headphones } from 'lucide-react';
 import { Summary } from '../types';
-import { getExampleSummaries, getBookmarkedNewsItems } from '../lib/supabase';
+import { getExampleSummaries, getBookmarkedNewsItems, getExampleNewsItems } from '../lib/supabase';
 import { useNewsStore } from '../store/newsStore';
 import UpgradeModal from '../components/ui/UpgradeModal';
 
 // Helper function to get descriptive summary level label
 const getSummaryLevelLabel = (level: number, isEli5: boolean): string => {
-  if (isEli5) return 'ELI5';
+  if (isEli5) return 'ELI5 TLDR';
   
   const labels = {
-    1: 'Short',
-    2: 'Long', 
-    3: 'Full'
+    1: 'Short TLDR',
+    2: 'Long TLDR', 
+    3: 'Full TLDR'
   };
   
-  return labels[level as keyof typeof labels] || `Level ${level}`;
+  return labels[level as keyof typeof labels] || `Level ${level} TLDR`;
 };
 
 interface BookmarkedNewsItem {
@@ -74,6 +74,10 @@ const SavedPage: React.FC = () => {
   const [selectedNewsItem, setSelectedNewsItem] = useState<string | null>(null);
   const [newsAudioLoading, setNewsAudioLoading] = useState<{ [id: string]: boolean }>({});
   const [newsCopiedId, setNewsCopiedId] = useState<string | null>(null);
+  
+  // Example news state for non-authenticated users
+  const [exampleNews, setExampleNews] = useState<BookmarkedNewsItem[]>([]);
+  const [exampleNewsLoading, setExampleNewsLoading] = useState(false);
   
   // Add new state for modals
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -143,12 +147,48 @@ const SavedPage: React.FC = () => {
       fetchSummaries();
       fetchBookmarkedNews();
     } else {
-      // Fetch example summaries for unauthenticated users
+      // Fetch example summaries and news for unauthenticated users
       setExampleLoading(true);
+      setExampleNewsLoading(true);
       (async () => {
-        const { data } = await getExampleSummaries();
-        setExampleSummaries(data || []);
+        const [summariesResult, newsResult] = await Promise.all([
+          getExampleSummaries(),
+          getExampleNewsItems()
+        ]);
+        setExampleSummaries(summariesResult.data || []);
+        
+        // Transform example news items to BookmarkedNewsItem format
+        const newsItems: BookmarkedNewsItem[] = (newsResult.data as unknown[])?.map((item) => {
+          const newsData = (item as { 
+            news: {
+              id: string;
+              title: string;
+              source_url: string;
+              summary: string;
+              tldr?: string;
+              audio_url?: string;
+              category: string;
+              published_at: string;
+              image_url?: string;
+            }
+          }).news;
+          return {
+            id: newsData.id,
+            title: newsData.title,
+            sourceUrl: newsData.source_url,
+            summary: newsData.summary,
+            tldr: newsData.tldr,
+            audioUrl: newsData.audio_url,
+            category: newsData.category,
+            publishedAt: newsData.published_at,
+            imageUrl: newsData.image_url,
+            inPlaylist: false, // Default for example content
+          };
+        }) || [];
+        
+        setExampleNews(newsItems);
         setExampleLoading(false);
+        setExampleNewsLoading(false);
       })();
     }
   }, [isAuthenticated, fetchSummaries]);
@@ -402,7 +442,7 @@ const SavedPage: React.FC = () => {
   };
   
   if (!isAuthenticated) {
-    if (exampleLoading) {
+    if (exampleLoading || exampleNewsLoading) {
       return <div>Loading example TLDRs...</div>;
     }
 
@@ -414,93 +454,375 @@ const SavedPage: React.FC = () => {
       toggleAudio(summary.id, summary.audioUrl);
     };
 
+    const handleExampleNewsSpeakerClick = async (newsItem: BookmarkedNewsItem, e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!newsItem.audioUrl) return;
+      
+      // Use global audio store to handle playback
+      toggleAudio(newsItem.id, newsItem.audioUrl);
+    };
+
     return (
       <div>
-        <div className="space-y-4">
-          {exampleSummaries.map((summary) => (
-            <Card 
-              key={summary.id}
-              onClick={() => setSelectedSummary(summary.id === selectedSummary ? null : summary.id)}
-              className="cursor-pointer hover:border-blue-300 border border-gray-200 dark:border-gray-700 transition-all"
-            >
-              <CardContent>
-                <div className="flex justify-between items-start">
-                  <h3 className="font-medium text-lg mb-2 line-clamp-1">
-                    {summary.title}
-                  </h3>
-                  <button
-                    className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedSummary(summary.id === selectedSummary ? null : summary.id);
-                    }}
-                  >
-                    <ChevronDown 
-                      size={20} 
-                      className={`text-gray-500 dark:text-gray-400 transition-transform ${selectedSummary === summary.id ? 'rotate-180' : ''}`} 
-                    />
-                  </button>
-                </div>
+        {/* Tabs for non-authenticated users */}
+        <div className="flex space-x-1 mb-6 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+          <button
+            onClick={() => setActiveTab('summaries')}
+            className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              activeTab === 'summaries'
+                ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+            }`}
+          >
+            <div className="flex items-center justify-center gap-2">
+              <FileText size={16} />
+              <span>Example TLDRs ({exampleSummaries.length})</span>
+            </div>
+          </button>
+          <button
+            onClick={() => setActiveTab('news')}
+            className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              activeTab === 'news'
+                ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+            }`}
+          >
+            <div className="flex items-center justify-center gap-2">
+              <Save size={16} />
+              <span>Example News TLDRs ({exampleNews.length})</span>
+            </div>
+          </button>
+        </div>
 
-                {selectedSummary === summary.id ? (
-                  <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                    <div className="prose prose-blue max-w-none dark:prose-invert">
-                      <ReactMarkdown>
-                        {summary.summary
-                          .split('\n')
-                          .filter(line => !/^#+ /.test(line.trim()))
-                          .join('\n')}
-                      </ReactMarkdown>
+        {/* Content based on active tab */}
+        {activeTab === 'summaries' ? (
+          <div className="space-y-4">
+            {exampleSummaries.map((summary) => (
+              <Card 
+                key={summary.id}
+                onClick={() => setSelectedSummary(summary.id === selectedSummary ? null : summary.id)}
+                className="cursor-pointer hover:border-blue-300 border border-gray-200 dark:border-gray-700 transition-all"
+              >
+                <CardContent>
+                  <div className="flex justify-between items-start">
+                    <h3 className="font-medium text-lg mb-2 line-clamp-1">
+                      {summary.title}
+                    </h3>
+                    <button
+                      className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedSummary(summary.id === selectedSummary ? null : summary.id);
+                      }}
+                    >
+                      <ChevronDown 
+                        size={20} 
+                        className={`text-gray-500 dark:text-gray-400 transition-transform ${selectedSummary === summary.id ? 'rotate-180' : ''}`} 
+                      />
+                    </button>
+                  </div>
+
+                  {selectedSummary === summary.id ? (
+                    <div className="relative">
+                      <div className="flex justify-between items-start mb-4">
+                        <div className="flex-1" />
+                        <div className="flex items-center gap-2">
+                          <button
+                            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                            title={copiedId === summary.id ? 'Copied!' : 'Copy summary'}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const textToCopy = summary.summary
+                                .split('\n')
+                                .filter(line => !/^#+ /.test(line.trim()))
+                                .join('\n');
+                              navigator.clipboard.writeText(textToCopy);
+                              setCopiedId(summary.id);
+                              setTimeout(() => setCopiedId(null), 1500);
+                            }}
+                          >
+                            <Copy size={20} />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handlePlaylistToggle(summary);
+                            }}
+                            className={`p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${
+                              summary.inPlaylist ? 'bg-purple-100 dark:bg-purple-900/20' : ''
+                            }`}
+                            title={summary.inPlaylist ? 'Remove from Listen playlist' : 'Add to Listen playlist'}
+                          >
+                            <Headphones size={20} className={summary.inPlaylist ? 'text-purple-600 dark:text-purple-400' : 'text-gray-500 dark:text-gray-400'} />
+                          </button>
+                          <button
+                            onClick={(e) => handleSpeakerClick(summary, e)}
+                            className={`p-2 rounded-full transition-colors border border-gray-200 dark:border-gray-700
+                              ${audioLoading[summary.id] 
+                                ? 'animate-pulse bg-green-200' 
+                                : currentlyPlaying === summary.id && isPlaying
+                                ? 'bg-green-600'
+                                : summary.audioUrl 
+                                ? 'bg-green-500' 
+                                : 'bg-gray-200 dark:bg-gray-700'
+                              }
+                            `}
+                            title={
+                              audioLoading[summary.id]
+                                ? 'Generating audio...'
+                                : currentlyPlaying === summary.id && isPlaying
+                                ? 'Pause audio'
+                                : summary.audioUrl
+                                ? 'Play audio'
+                                : 'Generate audio'
+                            }
+                            disabled={audioLoading[summary.id]}
+                          >
+                            <Volume2
+                              size={20}
+                              className={
+                                audioLoading[summary.id]
+                                  ? 'text-green-700'
+                                  : currentlyPlaying === summary.id && isPlaying
+                                  ? 'text-white animate-pulse'
+                                  : summary.audioUrl
+                                  ? 'text-white'
+                                  : 'text-gray-500 dark:text-gray-400'
+                              }
+                            />
+                          </button>
+                        </div>
+                      </div>
+                      {copiedId === summary.id && (
+                        <span className="absolute top-0 right-24 mt-2 px-2 py-1 bg-green-500 text-white text-xs rounded shadow">Copied!</span>
+                      )}
+                      <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="flex items-center space-x-2">
+                            <FileText size={16} className="text-blue-600 dark:text-blue-400" />
+                            <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                              {getSummaryLevelLabel(summary.summaryLevel, summary.isEli5)}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                              title={copiedId === summary.id ? 'Copied!' : 'Copy summary'}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const textToCopy = summary.summary
+                                  .split('\n')
+                                  .filter(line => !/^#+ /.test(line.trim()))
+                                  .join('\n');
+                                navigator.clipboard.writeText(textToCopy);
+                                setCopiedId(summary.id);
+                                setTimeout(() => setCopiedId(null), 1500);
+                              }}
+                            >
+                              <Copy size={18} />
+                            </button>
+                            {copiedId === summary.id && (
+                              <span className="absolute top-0 right-24 mt-2 px-2 py-1 bg-green-500 text-white text-xs rounded shadow">Copied!</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="prose prose-blue max-w-none dark:prose-invert">
+                          <ReactMarkdown>
+                            {summary.summary
+                              .split('\n')
+                              .filter(line => !/^#+ /.test(line.trim()))
+                              .join('\n')}
+                          </ReactMarkdown>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-gray-600 dark:text-gray-400 line-clamp-2">
+                      {summary.summary}
+                    </p>
+                  )}
+
+                  <div className="flex justify-between items-center mt-4 text-sm text-gray-500 dark:text-gray-400">
+                    <span>
+                      {new Date(summary.createdAt).toLocaleDateString()}
+                    </span>
+                    <span>
+                      {getSummaryLevelLabel(summary.summaryLevel, summary.isEli5)}
+                    </span>
+                    <button
+                      onClick={(e) => handleExampleSpeakerClick(summary, e)}
+                      className={`ml-2 p-2 rounded-full transition-colors border border-gray-200 dark:border-gray-700
+                        ${currentlyPlaying === summary.id && isPlaying
+                          ? 'bg-green-600'
+                          : summary.audioUrl 
+                          ? 'bg-green-500' 
+                          : 'bg-gray-200 dark:bg-gray-700'
+                        }
+                      `}
+                      title={
+                        currentlyPlaying === summary.id && isPlaying
+                          ? 'Pause audio'
+                          : summary.audioUrl
+                          ? 'Play audio'
+                          : 'Audio not available'
+                      }
+                      disabled={!summary.audioUrl}
+                    >
+                      <Volume2
+                        size={20}
+                        className={
+                          currentlyPlaying === summary.id && isPlaying
+                            ? 'text-white animate-pulse'
+                            : summary.audioUrl
+                            ? 'text-white'
+                            : 'text-gray-500 dark:text-gray-400'
+                        }
+                      />
+                    </button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          // Example News Tab
+          <div className="space-y-4">
+            {exampleNews.map((newsItem) => (
+              <Card 
+                key={newsItem.id}
+                onClick={() => setSelectedNewsItem(newsItem.id === selectedNewsItem ? null : newsItem.id)}
+                className="cursor-pointer hover:border-blue-300 border border-gray-200 dark:border-gray-700 transition-all"
+              >
+                <CardContent>
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="text-sm font-medium px-2 py-1 rounded-full bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300">
+                      News TLDR
+                    </span>
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                      {new Date(newsItem.publishedAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                  
+                  <h3 className="font-medium text-lg mb-2 line-clamp-1">
+                    {newsItem.title}
+                  </h3>
+                  
+                  <div className="flex justify-between items-start">
+                    <p className="text-gray-600 dark:text-gray-400 line-clamp-2 mb-4 flex-1">
+                      {newsItem.summary}
+                    </p>
+                    <div className="flex items-center gap-2 ml-2">
+                      <button
+                        onClick={(e) => handleExampleNewsSpeakerClick(newsItem, e)}
+                        className={`p-2 rounded-full transition-colors border border-gray-200 dark:border-gray-700
+                          ${currentlyPlaying === newsItem.id && isPlaying
+                            ? 'bg-green-600'
+                            : newsItem.audioUrl 
+                            ? 'bg-green-500' 
+                            : 'bg-gray-200 dark:bg-gray-700'
+                          }
+                        `}
+                        title={
+                          currentlyPlaying === newsItem.id && isPlaying
+                            ? 'Pause audio'
+                            : newsItem.audioUrl
+                            ? 'Play audio'
+                            : 'Audio not available'
+                        }
+                        disabled={!newsItem.audioUrl}
+                      >
+                        <Volume2
+                          size={20}
+                          className={
+                            currentlyPlaying === newsItem.id && isPlaying
+                              ? 'text-white animate-pulse'
+                              : newsItem.audioUrl
+                              ? 'text-white'
+                              : 'text-gray-500 dark:text-gray-400'
+                          }
+                        />
+                      </button>
                     </div>
                   </div>
-                ) : (
-                  <p className="text-gray-600 dark:text-gray-400 line-clamp-2">
-                    {summary.summary}
-                  </p>
-                )}
 
-                <div className="flex justify-between items-center mt-4 text-sm text-gray-500 dark:text-gray-400">
-                  <span>
-                    {new Date(summary.createdAt).toLocaleDateString()}
-                  </span>
-                  <span>
-                    {summary.isEli5 ? 'ELI5' : `Level ${summary.summaryLevel}`}
-                  </span>
-                  <button
-                    onClick={(e) => handleExampleSpeakerClick(summary, e)}
-                    className={`ml-2 p-2 rounded-full transition-colors border border-gray-200 dark:border-gray-700
-                      ${currentlyPlaying === summary.id && isPlaying
-                        ? 'bg-green-600'
-                        : summary.audioUrl 
-                        ? 'bg-green-500' 
-                        : 'bg-gray-200 dark:bg-gray-700'
-                      }
-                    `}
-                    title={
-                      currentlyPlaying === summary.id && isPlaying
-                        ? 'Pause audio'
-                        : summary.audioUrl
-                        ? 'Play audio'
-                        : 'Audio not available'
-                    }
-                    disabled={!summary.audioUrl}
-                  >
-                    <Volume2
-                      size={20}
-                      className={
-                        currentlyPlaying === summary.id && isPlaying
-                          ? 'text-white animate-pulse'
-                          : summary.audioUrl
-                          ? 'text-white'
-                          : 'text-gray-500 dark:text-gray-400'
-                      }
-                    />
-                  </button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                  {selectedNewsItem === newsItem.id && newsItem.tldr && (
+                    <div 
+                      className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800 relative overflow-hidden"
+                      style={{
+                        backgroundImage: newsItem.imageUrl 
+                          ? `url(${newsItem.imageUrl})`
+                          : 'none',
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                        minHeight: '200px'
+                      }}
+                    >
+                      {/* Semi-transparent overlay for better readability */}
+                      {newsItem.imageUrl && (
+                        <div className="absolute inset-0 bg-white/30 dark:bg-gray-800/40" />
+                      )}
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex items-center space-x-2">
+                          <FileText size={16} className="text-blue-600 dark:text-blue-400" />
+                          <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                            TLDR Summary
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                            title={newsCopiedId === newsItem.id ? 'Copied!' : 'Copy TLDR'}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigator.clipboard.writeText(newsItem.tldr || '');
+                              setNewsCopiedId(newsItem.id);
+                              setTimeout(() => setNewsCopiedId(null), 1500);
+                            }}
+                          >
+                            <Copy size={18} />
+                          </button>
+                          {newsCopiedId === newsItem.id && (
+                            <span className="absolute top-0 right-24 mt-2 px-2 py-1 bg-green-500 text-white text-xs rounded shadow">Copied!</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="prose prose-blue max-w-none dark:prose-invert">
+                        <ReactMarkdown>{newsItem.tldr}</ReactMarkdown>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex justify-between items-center">
+                    <a
+                      href={newsItem.sourceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 dark:text-blue-400 hover:underline text-sm font-medium"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      Read Full Article →
+                    </a>
+                    {newsItem.tldr && (
+                      <button
+                        className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                        title={selectedNewsItem === newsItem.id ? 'Hide TLDR' : 'Show TLDR'}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedNewsItem(newsItem.id === selectedNewsItem ? null : newsItem.id);
+                        }}
+                      >
+                        <ChevronDown 
+                          size={20} 
+                          className={`text-gray-500 dark:text-gray-400 transition-transform ${selectedNewsItem === newsItem.id ? '' : 'rotate-180'}`} 
+                        />
+                      </button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
     );
   }
@@ -710,13 +1032,44 @@ const SavedPage: React.FC = () => {
                             {copiedId === summary.id && (
                               <span className="absolute top-0 right-24 mt-2 px-2 py-1 bg-green-500 text-white text-xs rounded shadow">Copied!</span>
                             )}
-                            <div className="prose dark:prose-invert max-w-none">
-                              <ReactMarkdown>
-                                {summary.summary
-                                  .split('\n')
-                                  .filter(line => !/^#+ /.test(line.trim()))
-                                  .join('\n')}
-                              </ReactMarkdown>
+                            <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                              <div className="flex justify-between items-start mb-2">
+                                <div className="flex items-center space-x-2">
+                                  <FileText size={16} className="text-blue-600 dark:text-blue-400" />
+                                  <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                                    {getSummaryLevelLabel(summary.summaryLevel, summary.isEli5)}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                    title={copiedId === summary.id ? 'Copied!' : 'Copy summary'}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const textToCopy = summary.summary
+                                        .split('\n')
+                                        .filter(line => !/^#+ /.test(line.trim()))
+                                        .join('\n');
+                                      navigator.clipboard.writeText(textToCopy);
+                                      setCopiedId(summary.id);
+                                      setTimeout(() => setCopiedId(null), 1500);
+                                    }}
+                                  >
+                                    <Copy size={18} />
+                                  </button>
+                                  {copiedId === summary.id && (
+                                    <span className="absolute top-0 right-24 mt-2 px-2 py-1 bg-green-500 text-white text-xs rounded shadow">Copied!</span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="prose prose-blue max-w-none dark:prose-invert">
+                                <ReactMarkdown>
+                                  {summary.summary
+                                    .split('\n')
+                                    .filter(line => !/^#+ /.test(line.trim()))
+                                    .join('\n')}
+                                </ReactMarkdown>
+                              </div>
                             </div>
                           </div>
                         ) : (
@@ -867,7 +1220,7 @@ const SavedPage: React.FC = () => {
                     
                     <div className="flex justify-between items-start mb-2">
                       <span className="text-sm font-medium px-2 py-1 rounded-full bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300">
-                        {newsItem.category}
+                        News TLDR
                       </span>
                       <span className="text-sm text-gray-500 dark:text-gray-400">
                         {new Date(newsItem.publishedAt).toLocaleDateString()}
@@ -936,12 +1289,11 @@ const SavedPage: React.FC = () => {
 
                     {selectedNewsItem === newsItem.id && newsItem.tldr && (
                       <div 
-                        className="mb-4 p-3 rounded-lg border border-blue-200 dark:border-blue-800 relative overflow-hidden"
+                        className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800 relative overflow-hidden"
                         style={{
                           backgroundImage: newsItem.imageUrl 
                             ? `url(${newsItem.imageUrl})`
                             : 'none',
-                          backgroundColor: newsItem.imageUrl ? 'transparent' : 'rgb(239 246 255)',
                           backgroundSize: 'cover',
                           backgroundPosition: 'center',
                           minHeight: '200px'
@@ -949,12 +1301,9 @@ const SavedPage: React.FC = () => {
                       >
                         {/* Semi-transparent overlay for better readability */}
                         {newsItem.imageUrl && (
-                          <div 
-                            className="absolute inset-0 bg-white/30 dark:bg-gray-800/40" 
-                            style={{ zIndex: 1 }}
-                          />
+                          <div className="absolute inset-0 bg-white/30 dark:bg-gray-800/40" />
                         )}
-                        <div className="flex justify-between items-start mb-2 relative z-10">
+                        <div className="flex justify-between items-start mb-2">
                           <div className="flex items-center space-x-2">
                             <FileText size={16} className="text-blue-600 dark:text-blue-400" />
                             <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
@@ -979,7 +1328,7 @@ const SavedPage: React.FC = () => {
                             )}
                           </div>
                         </div>
-                        <div className="prose prose-blue max-w-none dark:prose-invert relative z-10">
+                        <div className="prose prose-blue max-w-none dark:prose-invert">
                           <ReactMarkdown>{newsItem.tldr}</ReactMarkdown>
                         </div>
                       </div>

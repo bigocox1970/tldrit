@@ -25,8 +25,8 @@ const HeroSection: React.FC = () => {
     let interval: NodeJS.Timeout;
     if (dynamicTexts[currentTextIndex] === HERO_SPECIAL) {
       if (ohStep === 0) {
-        // After 500ms, start animating dots
-        interval = setTimeout(() => setOhStep(1), 500);
+        // Add a pause before starting animation
+        interval = setTimeout(() => setOhStep(1), 1000);
       } else if (ohStep === 1) {
         // Animate dots: '.', '..', '...'
         if (dotCount < 3) {
@@ -44,8 +44,10 @@ const HeroSection: React.FC = () => {
         }, 2500);
       }
     } else {
-      // Add dots animation before changing text
-      if (dotCount < 3) {
+      // Add a pause before dots start animating
+      if (dotCount === 1) {
+        interval = setTimeout(() => setDotCount(dotCount + 1), 800);
+      } else if (dotCount < 3) {
         interval = setTimeout(() => setDotCount(dotCount + 1), 250);
       } else {
         interval = setTimeout(() => {
@@ -69,16 +71,16 @@ const HeroSection: React.FC = () => {
       return (
         <span>
           <span className="text-gray-900 dark:text-white font-extrabold">Oh,</span>
-          <span className="inline-block w-8 text-gray-900 dark:text-white animate-pulse">{' '.repeat(1)}{'.'.repeat(dotCount)}</span>
+          <span className="inline-block text-gray-900 dark:text-white">{'.'.repeat(dotCount)}</span>
         </span>
       );
     } else {
       // Reveal the rest
       return (
         <span>
-          <span className="text-gray-900 dark:text-white font-extrabold">Oh,</span>
-          <span className="inline-block w-8 text-gray-900 dark:text-white">...</span>
-          <span className="ml-2">and <span className="text-gray-900 dark:text-white font-extrabold">ANY</span> webpage</span>
+          <span className="text-gray-900 dark:text-white font-extrabold">Oh, and </span>
+          <span className="text-gray-900 dark:text-white font-extrabold">ANY</span>
+          <span> webpage!</span>
         </span>
       );
     }
@@ -103,10 +105,7 @@ const HeroSection: React.FC = () => {
           <div className="flex flex-wrap items-center justify-center gap-x-2">
             <span className="text-gray-900 dark:text-white font-extrabold">TLDR</span>
             <span className="whitespace-nowrap transition-all duration-500 ease-in-out text-blue-600 dark:text-blue-400">
-              {dynamicTexts[currentTextIndex]}
-              <span className="inline-block text-gray-900 dark:text-white ml-1" style={{ transform: `translateX(${(dotCount - 1) * 4}px)` }}>
-                {'.'.repeat(dotCount)}
-              </span>
+              {dynamicTexts[currentTextIndex]}<span className="inline-block text-gray-900 dark:text-white">{'.'.repeat(dotCount)}</span>
             </span>
           </div>
         )}

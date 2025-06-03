@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import ReactMarkdown from 'react-markdown';
 import { useSummaryStore } from '../store/summaryStore';
 import { useAuthStore } from '../store/authStore';
 import { useAudioStore } from '../store/audioStore';
@@ -8,9 +9,9 @@ import Card, { CardContent } from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import StickyMediaPlayer from '../components/StickyMediaPlayer';
 import DraggablePlaylistItem from '../components/DraggablePlaylistItem';
-import { getExampleSummaries, getPlaylistNewsItems } from '../lib/supabase';
+import { getExampleSummaries, getPlaylistNewsItems, getExampleNewsItems } from '../lib/supabase';
 import { Summary } from '../types';
-import { Headphones, CheckSquare, Square, Play } from 'lucide-react';
+import { Headphones, CheckSquare, Square, Play, Volume2, ChevronDown, FileText } from 'lucide-react';
 import {
   DndContext,
   DragEndEvent,
@@ -63,7 +64,7 @@ const ListenPage: React.FC = () => {
     setSelectedListenItems,
     isListenEditMode
   } = useSummaryStore();
-  const { currentlyPlaying, toggleAudio, setOnTrackEnd } = useAudioStore();
+  const { toggleAudio, currentlyPlaying, isPlaying, setOnTrackEnd } = useAudioStore();
   const { 
     selectedListenNewsItems,
     setSelectedListenNewsItems,
@@ -76,7 +77,15 @@ const ListenPage: React.FC = () => {
   
   // Playlist news state
   const [playlistNews, setPlaylistNews] = useState<PlaylistNewsItem[]>([]);
-  const [newsLoading, setNewsLoading] = useState(false);
+  const [playlistNewsLoading, setPlaylistNewsLoading] = useState(false);
+
+  // Example news state for non-authenticated users
+  const [exampleNews, setExampleNews] = useState<PlaylistNewsItem[]>([]);
+  const [exampleNewsLoading, setExampleNewsLoading] = useState(false);
+
+  // Expansion state for non-authenticated users
+  const [selectedSummary, setSelectedSummary] = useState<string | null>(null);
+  const [selectedNewsItem, setSelectedNewsItem] = useState<string | null>(null);
 
   // Playlist order state
   const [playlistOrder, setPlaylistOrder] = useState<string[]>([]);
@@ -101,7 +110,7 @@ const ListenPage: React.FC = () => {
     if (!user) return;
     
     console.log('[Listen Page] fetchPlaylistNews starting...');
-    setNewsLoading(true);
+    setPlaylistNewsLoading(true);
     try {
       const { data, error } = await getPlaylistNewsItems(user.id);
       console.log('[Listen Page] getPlaylistNewsItems result:', { data, error });
@@ -146,7 +155,7 @@ const ListenPage: React.FC = () => {
     } catch (error) {
       console.error('Error fetching playlist news:', error);
     } finally {
-      setNewsLoading(false);
+      setPlaylistNewsLoading(false);
     }
   };
 
@@ -168,10 +177,45 @@ const ListenPage: React.FC = () => {
       fetchPlaylistNews();
     } else {
       setExampleLoading(true);
+      setExampleNewsLoading(true);
       (async () => {
-        const { data } = await getExampleSummaries();
-        setExampleSummaries((data || []).filter(s => s.audioUrl));
+        const [summariesResult, newsResult] = await Promise.all([
+          getExampleSummaries(),
+          getExampleNewsItems()
+        ]);
+        setExampleSummaries((summariesResult.data || []).filter(s => s.audioUrl));
+        
+        // Transform example news items to PlaylistNewsItem format
+        const newsItems: PlaylistNewsItem[] = (newsResult.data as unknown[])?.map((item) => {
+          const newsData = (item as { 
+            news: {
+              id: string;
+              title: string;
+              source_url: string;
+              summary: string;
+              tldr?: string;
+              audio_url?: string;
+              category: string;
+              published_at: string;
+              image_url?: string;
+            }
+          }).news;
+          return {
+            id: newsData.id,
+            title: newsData.title,
+            sourceUrl: newsData.source_url,
+            summary: newsData.summary,
+            tldr: newsData.tldr,
+            audioUrl: newsData.audio_url,
+            category: newsData.category,
+            publishedAt: newsData.published_at,
+            imageUrl: newsData.image_url,
+          };
+        }) || [];
+        
+        setExampleNews(newsItems);
         setExampleLoading(false);
+        setExampleNewsLoading(false);
       })();
     }
   }, [isAuthenticated, fetchSummaries]);
@@ -435,36 +479,230 @@ const ListenPage: React.FC = () => {
   }, [unifiedPlaylist, selectedListenItems, selectedListenNewsItems]);
 
   if (!isAuthenticated) {
-    if (exampleLoading) {
+    if (exampleLoading || exampleNewsLoading) {
       return <div className="pb-32 md:pb-20">Loading example TLDRs...</div>;
     }
+
+    const handleExampleSpeakerClick = async (item: { audioUrl?: string; id: string }, e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!item.audioUrl) return;
+      toggleAudio(item.id, item.audioUrl);
+    };
 
     return (
       <div className="pb-32 md:pb-20">
         <div className="space-y-3">
+          {/* Example Summaries */}
           {exampleSummaries.map((summary) => (
-            <DraggablePlaylistItem
+            <Card 
               key={summary.id}
-              item={{
-                id: summary.id,
-                title: summary.title,
-                audioUrl: summary.audioUrl,
-                type: 'summary',
-                createdAt: summary.createdAt,
-                isEli5: summary.isEli5,
-                summaryLevel: summary.summaryLevel,
-              }}
-              isSelected={false}
-              isEditMode={false}
-              onSelect={() => {}}
-            />
+              onClick={() => setSelectedSummary(summary.id === selectedSummary ? null : summary.id)}
+              className="cursor-pointer hover:border-blue-300 border border-gray-200 dark:border-gray-700 transition-all"
+            >
+              <CardContent>
+                <div className="flex justify-between items-start">
+                  <h3 className="font-medium text-lg mb-2 line-clamp-1">
+                    {summary.title}
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
+                      {summary.isEli5 ? 'ELI5 TLDR' : `${summary.summaryLevel === 1 ? 'Short' : summary.summaryLevel === 2 ? 'Long' : 'Full'} TLDR`}
+                    </span>
+                    <button
+                      className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedSummary(summary.id === selectedSummary ? null : summary.id);
+                      }}
+                    >
+                      <ChevronDown 
+                        size={20} 
+                        className={`text-gray-500 dark:text-gray-400 transition-transform ${selectedSummary === summary.id ? 'rotate-180' : ''}`} 
+                      />
+                    </button>
+                  </div>
+                </div>
+
+                {selectedSummary === summary.id ? (
+                  <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <div className="prose prose-blue max-w-none dark:prose-invert">
+                      <ReactMarkdown>
+                        {summary.summary
+                          .split('\n')
+                          .filter(line => !/^#+ /.test(line.trim()))
+                          .join('\n')}
+                      </ReactMarkdown>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-gray-600 dark:text-gray-400 line-clamp-2">
+                    {summary.summary}
+                  </p>
+                )}
+
+                <div className="flex justify-between items-center mt-4 text-sm text-gray-500 dark:text-gray-400">
+                  <span>
+                    {new Date(summary.createdAt).toLocaleDateString()}
+                  </span>
+                  <button
+                    onClick={(e) => handleExampleSpeakerClick(summary, e)}
+                    className={`ml-2 p-2 rounded-full transition-colors border border-gray-200 dark:border-gray-700
+                      ${currentlyPlaying === summary.id && isPlaying
+                        ? 'bg-green-600'
+                        : summary.audioUrl 
+                        ? 'bg-green-500' 
+                        : 'bg-gray-200 dark:bg-gray-700'
+                      }
+                    `}
+                    title={
+                      currentlyPlaying === summary.id && isPlaying
+                        ? 'Pause audio'
+                        : summary.audioUrl
+                        ? 'Play audio'
+                        : 'Audio not available'
+                    }
+                    disabled={!summary.audioUrl}
+                  >
+                    <Volume2
+                      size={20}
+                      className={
+                        currentlyPlaying === summary.id && isPlaying
+                          ? 'text-white animate-pulse'
+                          : summary.audioUrl
+                          ? 'text-white'
+                          : 'text-gray-500 dark:text-gray-400'
+                      }
+                    />
+                  </button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+
+          {/* Example News Items */}
+          {exampleNews.map((newsItem) => (
+            <Card 
+              key={newsItem.id}
+              onClick={() => setSelectedNewsItem(newsItem.id === selectedNewsItem ? null : newsItem.id)}
+              className="cursor-pointer hover:border-blue-300 border border-gray-200 dark:border-gray-700 transition-all"
+            >
+              <CardContent>
+                <div className="flex justify-between items-start mb-2">
+                  <span className="text-xs px-2 py-1 rounded-full bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300">
+                    News TLDR
+                  </span>
+                  <span className="text-sm text-gray-500 dark:text-gray-400">
+                    {new Date(newsItem.publishedAt).toLocaleDateString()}
+                  </span>
+                </div>
+                
+                <h3 className="font-medium text-lg mb-2 line-clamp-1">
+                  {newsItem.title}
+                </h3>
+                
+                <div className="flex justify-between items-start">
+                  <p className="text-gray-600 dark:text-gray-400 line-clamp-2 mb-4 flex-1">
+                    {newsItem.summary}
+                  </p>
+                  <div className="flex items-center gap-2 ml-2">
+                    <button
+                      onClick={(e) => handleExampleSpeakerClick(newsItem, e)}
+                      className={`p-2 rounded-full transition-colors border border-gray-200 dark:border-gray-700
+                        ${currentlyPlaying === newsItem.id && isPlaying
+                          ? 'bg-green-600'
+                          : newsItem.audioUrl 
+                          ? 'bg-green-500' 
+                          : 'bg-gray-200 dark:bg-gray-700'
+                        }
+                      `}
+                      title={
+                        currentlyPlaying === newsItem.id && isPlaying
+                          ? 'Pause audio'
+                          : newsItem.audioUrl
+                          ? 'Play audio'
+                          : 'Audio not available'
+                      }
+                      disabled={!newsItem.audioUrl}
+                    >
+                      <Volume2
+                        size={20}
+                        className={
+                          currentlyPlaying === newsItem.id && isPlaying
+                            ? 'text-white animate-pulse'
+                            : newsItem.audioUrl
+                            ? 'text-white'
+                            : 'text-gray-500 dark:text-gray-400'
+                        }
+                      />
+                    </button>
+                  </div>
+                </div>
+
+                {selectedNewsItem === newsItem.id && newsItem.tldr && (
+                  <div 
+                    className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800 relative overflow-hidden"
+                    style={{
+                      backgroundImage: newsItem.imageUrl 
+                        ? `url(${newsItem.imageUrl})`
+                        : 'none',
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
+                      minHeight: '200px'
+                    }}
+                  >
+                    {/* Semi-transparent overlay for better readability */}
+                    {newsItem.imageUrl && (
+                      <div className="absolute inset-0 bg-white/30 dark:bg-gray-800/40" />
+                    )}
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="flex items-center space-x-2">
+                        <FileText size={16} className="text-blue-600 dark:text-blue-400" />
+                        <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                          TLDR Summary
+                        </span>
+                      </div>
+                    </div>
+                    <div className="prose prose-blue max-w-none dark:prose-invert">
+                      <ReactMarkdown>{newsItem.tldr}</ReactMarkdown>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex justify-between items-center">
+                  <a
+                    href={newsItem.sourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 dark:text-blue-400 hover:underline text-sm font-medium"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    Read Full Article →
+                  </a>
+                  {newsItem.tldr && (
+                    <button
+                      className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                      title={selectedNewsItem === newsItem.id ? 'Hide TLDR' : 'Show TLDR'}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedNewsItem(newsItem.id === selectedNewsItem ? null : newsItem.id);
+                      }}
+                    >
+                      <ChevronDown 
+                        size={20} 
+                        className={`text-gray-500 dark:text-gray-400 transition-transform ${selectedNewsItem === newsItem.id ? '' : 'rotate-180'}`} 
+                      />
+                    </button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           ))}
         </div>
       </div>
     );
   }
   
-  if (isLoading && newsLoading) {
+  if (isLoading || playlistNewsLoading) {
     return (
       <div className="pb-32 md:pb-20">
         <p>Loading audio content...</p>
@@ -579,13 +817,6 @@ const ListenPage: React.FC = () => {
                   isEditMode={isEditMode}
                   onSelect={handleItemSelect}
                   onTrackJump={handleTrackJump}
-                  onNavigateToSource={() => {
-                    if (item.type === 'summary') {
-                      navigate('/saved');
-                    } else {
-                      navigate('/news');
-                    }
-                  }}
                 />
               );
             })}

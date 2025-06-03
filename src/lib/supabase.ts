@@ -348,6 +348,49 @@ export async function getExampleSummaries(): Promise<{ data: Summary[] | null; e
   }
 }
 
+export async function getExampleNewsItems() {
+  try {
+    // Get example user ID
+    const { data: exampleUserId, error: userError } = await supabase
+      .rpc('get_example_user_id');
+    
+    if (userError) throw userError;
+    if (!exampleUserId) {
+      return { data: null, error: null };
+    }
+
+    // Get bookmarked news items from example user
+    const { data, error } = await supabase
+      .from('user_news_meta')
+      .select(`
+        news_id,
+        bookmarked,
+        in_playlist,
+        news (
+          id,
+          title,
+          source_url,
+          url_hash,
+          summary,
+          tldr,
+          audio_url,
+          category,
+          published_at,
+          image_url
+        )
+      `)
+      .eq('user_id', exampleUserId)
+      .eq('bookmarked', true)
+      .order('created_at', { ascending: false });
+
+    if (error) return { data: null, error };
+
+    return { data, error: null };
+  } catch (error) {
+    return { data: null, error: error as PostgrestError };
+  }
+}
+
 // Get playlist news items for a user (news items with inPlaylist: true AND bookmarked: true)
 export async function getPlaylistNewsItems(userId: string) {
   const { data, error } = await supabase
