@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { File, Link as LinkIcon, Text, X, Volume2, Copy } from 'lucide-react';
+import { File, X, Volume2, Copy } from 'lucide-react';
 import { useSummaryStore } from '../../store/summaryStore';
 import { useAuthStore } from '../../store/authStore';
 import { useAudioStore } from '../../store/audioStore';
 import Button from '../ui/Button';
-import Input from '../ui/Input';
 import Toggle from '../ui/Toggle';
 import Slider from '../ui/Slider';
 import Card, { CardContent } from '../ui/Card';
@@ -15,19 +14,68 @@ import UpgradeModal from '../ui/UpgradeModal';
 interface SummarizeFormProps {
   initialContent?: string;
   autoStart?: boolean;
-  fileType?: boolean;
 }
+
+// Helper function to detect if input is a URL
+const isUrl = (text: string): boolean => {
+  const trimmed = text.trim();
+  
+  // Check for explicit protocol URLs
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return true;
+  }
+  
+  // Check for www. URLs
+  if (trimmed.startsWith('www.')) {
+    return true;
+  }
+  
+  // Check for domain-like patterns (e.g., google.com, example.org)
+  const domainPattern = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.([a-zA-Z]{2,}|[a-zA-Z]{2,}\.[a-zA-Z]{2,})([/\w.-]*)*\/?$/;
+  
+  return domainPattern.test(trimmed);
+};
+
+// Helper function to detect if input is ONLY a URL (not embedded in text)
+const isOnlyUrl = (text: string): boolean => {
+  const trimmed = text.trim();
+  
+  // Split by whitespace and check if it's just one URL
+  const words = trimmed.split(/\s+/);
+  
+  // If more than one word, it's likely text with embedded URL
+  if (words.length > 1) {
+    return false;
+  }
+  
+  // If exactly one word, check if it's a URL
+  return words.length === 1 && isUrl(words[0]);
+};
+
+// Helper function to ensure URL has protocol
+const normalizeUrl = (url: string): string => {
+  const trimmed = url.trim();
+  
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return trimmed;
+  }
+  
+  if (trimmed.startsWith('www.')) {
+    return `https://${trimmed}`;
+  }
+  
+  // For domain-only URLs, default to https
+  return `https://${trimmed}`;
+};
 
 const SummarizeForm: React.FC<SummarizeFormProps> = ({ 
   initialContent = '', 
-  autoStart = false,
-  fileType = false
+  autoStart = false
 }) => {
   const { createSummary, currentSummary, isLoading, summaries, generateAudioForSummary, loadingStatus } = useSummaryStore();
   const { isAuthenticated, user } = useAuthStore();
   const { currentlyPlaying, isPlaying, toggleAudio } = useAudioStore();
   
-  const [inputType, setInputType] = useState<'text' | 'url' | 'file'>('text');
   const [content, setContent] = useState(initialContent);
   const [file, setFile] = useState<File | null>(null);
   const [isEli5, setIsEli5] = useState(false);
@@ -66,7 +114,6 @@ const SummarizeForm: React.FC<SummarizeFormProps> = ({
               fileData.size === tempFile.size && 
               fileData.lastModified === tempFile.lastModified) {
             setFile(tempFile);
-            setInputType('file');
           }
           // Clean up
           sessionStorage.removeItem('tldrTempFormData');
@@ -78,13 +125,6 @@ const SummarizeForm: React.FC<SummarizeFormProps> = ({
     }
   }, []);
 
-  // Set input type based on fileType prop
-  useEffect(() => {
-    if (fileType) {
-      setInputType('file');
-    }
-  }, [fileType]);
-
   // Track if we've already auto-started
   const [hasAutoStarted, setHasAutoStarted] = useState(false);
 
@@ -93,9 +133,7 @@ const SummarizeForm: React.FC<SummarizeFormProps> = ({
     if (autoStart && isAuthenticated && !isLoading && !hasAutoStarted) {
       // Small delay to ensure the component is fully mounted
       const timer = setTimeout(() => {
-        if ((inputType === 'text' && content) || 
-            (inputType === 'file' && file) || 
-            (inputType === 'url' && content)) {
+        if (content || file) {
           // Create a function to auto-submit without needing an event
           autoSubmit();
           setHasAutoStarted(true);
@@ -109,7 +147,7 @@ const SummarizeForm: React.FC<SummarizeFormProps> = ({
       
       return () => clearTimeout(timer);
     }
-  }, [autoStart, isAuthenticated, content, file, inputType, isLoading, hasAutoStarted]);
+  }, [autoStart, isAuthenticated, content, file, isLoading, hasAutoStarted]);
 
   // Function to handle auto-submission without an event
   const autoSubmit = async () => {
@@ -125,41 +163,48 @@ const SummarizeForm: React.FC<SummarizeFormProps> = ({
     setShowOverlay(true);
     
     try {
-      if (inputType === 'text' && !content.trim()) {
-        setError('Please enter some text to summarize');
+      if (!content.trim() && !file) {
+        setError('Please enter some text, a URL, or upload a file to summarize');
         return;
       }
       
-      if (inputType === 'url' && !content.trim()) {
-        setError('Please enter a URL to summarize');
-        return;
+      // Check word count limits based on plan for text content
+      if (content.trim()) {
+        const wordCount = content.split(/\s+/).filter(word => word.length > 0).length;
+        const planLimits = {
+          free: 1000,
+          pro: 10000,
+          premium: Infinity
+        };
+        
+        const userPlan = user?.plan || 'free';
+        const wordLimit = planLimits[userPlan as keyof typeof planLimits];
+        
+        if (wordLimit !== Infinity && wordCount > wordLimit) {
+          setError(`${userPlan === 'free' ? 'Free' : 'Pro'} accounts are limited to ${wordLimit.toLocaleString()} words per document. Upgrade to process longer content.`);
+          setShowUpgradeModal(true);
+          return;
+        }
       }
       
-      if (inputType === 'file' && !file) {
-        setError('Please upload a file to summarize');
-        return;
-      }
+      // Determine content type automatically
+      let contentType: 'text' | 'url' | 'file';
+      let processedContent: string | File;
       
-      // Check word count limits based on plan
-      const wordCount = content.split(/\s+/).filter(word => word.length > 0).length;
-      const planLimits = {
-        free: 1000,
-        pro: 10000,
-        premium: Infinity
-      };
-      
-      const userPlan = user?.plan || 'free';
-      const wordLimit = planLimits[userPlan as keyof typeof planLimits];
-      
-      if (wordLimit !== Infinity && wordCount > wordLimit) {
-        setError(`${userPlan === 'free' ? 'Free' : 'Pro'} accounts are limited to ${wordLimit.toLocaleString()} words per document. Upgrade to process longer content.`);
-        setShowUpgradeModal(true);
-        return;
+      if (file) {
+        contentType = 'file';
+        processedContent = file;
+      } else if (isOnlyUrl(content)) {
+        contentType = 'url';
+        processedContent = normalizeUrl(content);
+      } else {
+        contentType = 'text';
+        processedContent = content;
       }
       
       await createSummary({
-        content: inputType === 'file' ? file! : content,
-        contentType: inputType,
+        content: processedContent,
+        contentType,
         summaryLevel,
         isEli5,
       });
@@ -189,41 +234,48 @@ const SummarizeForm: React.FC<SummarizeFormProps> = ({
     setShowOverlay(true);
     
     try {
-      if (inputType === 'text' && !content.trim()) {
-        setError('Please enter some text to summarize');
+      if (!content.trim() && !file) {
+        setError('Please enter some text, a URL, or upload a file to summarize');
         return;
       }
       
-      if (inputType === 'url' && !content.trim()) {
-        setError('Please enter a URL to summarize');
-        return;
+      // Check word count limits based on plan for text content
+      if (content.trim()) {
+        const wordCount = content.split(/\s+/).filter(word => word.length > 0).length;
+        const planLimits = {
+          free: 1000,
+          pro: 10000,
+          premium: Infinity
+        };
+        
+        const userPlan = user?.plan || 'free';
+        const wordLimit = planLimits[userPlan as keyof typeof planLimits];
+        
+        if (wordLimit !== Infinity && wordCount > wordLimit) {
+          setError(`${userPlan === 'free' ? 'Free' : 'Pro'} accounts are limited to ${wordLimit.toLocaleString()} words per document. Upgrade to process longer content.`);
+          setShowUpgradeModal(true);
+          return;
+        }
       }
       
-      if (inputType === 'file' && !file) {
-        setError('Please upload a file to summarize');
-        return;
-      }
+      // Determine content type automatically
+      let contentType: 'text' | 'url' | 'file';
+      let processedContent: string | File;
       
-      // Check word count limits based on plan
-      const wordCount = content.split(/\s+/).filter(word => word.length > 0).length;
-      const planLimits = {
-        free: 1000,
-        pro: 10000,
-        premium: Infinity
-      };
-      
-      const userPlan = user?.plan || 'free';
-      const wordLimit = planLimits[userPlan as keyof typeof planLimits];
-      
-      if (wordLimit !== Infinity && wordCount > wordLimit) {
-        setError(`${userPlan === 'free' ? 'Free' : 'Pro'} accounts are limited to ${wordLimit.toLocaleString()} words per document. Upgrade to process longer content.`);
-        setShowUpgradeModal(true);
-        return;
+      if (file) {
+        contentType = 'file';
+        processedContent = file;
+      } else if (isOnlyUrl(content)) {
+        contentType = 'url';
+        processedContent = normalizeUrl(content);
+      } else {
+        contentType = 'text';
+        processedContent = content;
       }
       
       await createSummary({
-        content: inputType === 'file' ? file! : content,
-        contentType: inputType,
+        content: processedContent,
+        contentType,
         summaryLevel,
         isEli5,
       });
@@ -236,9 +288,13 @@ const SummarizeForm: React.FC<SummarizeFormProps> = ({
     // Check for existing TL;DR in history
     const match = summaries.find(tldr => {
       let key;
-      if (inputType === 'url') key = content;
-      else if (inputType === 'file') key = file?.name;
-      else key = content;
+      if (file) {
+        key = file.name;
+      } else if (isOnlyUrl(content)) {
+        key = normalizeUrl(content);
+      } else {
+        key = content;
+      }
       return (
         tldr.originalContent === key &&
         tldr.summaryLevel === level &&
@@ -251,9 +307,24 @@ const SummarizeForm: React.FC<SummarizeFormProps> = ({
       return;
     }
     try {
+      // Determine content type automatically
+      let contentType: 'text' | 'url' | 'file';
+      let processedContent: string | File;
+      
+      if (file) {
+        contentType = 'file';
+        processedContent = file;
+      } else if (isOnlyUrl(content)) {
+        contentType = 'url';
+        processedContent = normalizeUrl(content);
+      } else {
+        contentType = 'text';
+        processedContent = content;
+      }
+      
       await createSummary({
-        content: inputType === 'file' ? file! : content,
-        contentType: inputType,
+        content: processedContent,
+        contentType,
         summaryLevel: level,
         isEli5: eli5,
         eli5Level: eli5 ? eli5Age : undefined,
@@ -277,7 +348,7 @@ const SummarizeForm: React.FC<SummarizeFormProps> = ({
       }
       
       setFile(selectedFile);
-      setInputType('file');
+      setContent(''); // Clear text content when file is selected
       setError('');
     }
   };
@@ -321,7 +392,7 @@ const SummarizeForm: React.FC<SummarizeFormProps> = ({
       }
       
       setFile(selectedFile);
-      setInputType('file');
+      setContent(''); // Clear text content when file is dropped
       setError('');
     }
   };
@@ -334,9 +405,13 @@ const SummarizeForm: React.FC<SummarizeFormProps> = ({
   useEffect(() => {
     if (pendingEli5Toggle === null) return;
     let key;
-    if (inputType === 'url') key = content;
-    else if (inputType === 'file') key = file?.name;
-    else key = content;
+    if (file) {
+      key = file.name;
+    } else if (isOnlyUrl(content)) {
+      key = normalizeUrl(content);
+    } else {
+      key = content;
+    }
     if (!pendingEli5Toggle) {
       // Toggling ELI off: try to load standard TL;DR from history
       const match = summaries.find(tldr =>
@@ -363,7 +438,7 @@ const SummarizeForm: React.FC<SummarizeFormProps> = ({
       }
     }
     setPendingEli5Toggle(null);
-  }, [pendingEli5Toggle, summaries, inputType, content, file, summaryLevel, useSummaryStore]);
+  }, [pendingEli5Toggle, summaries, content, file, summaryLevel, useSummaryStore]);
 
   const handleEli5Toggle = () => {
     setIsEli5((prev) => {
@@ -437,62 +512,33 @@ const SummarizeForm: React.FC<SummarizeFormProps> = ({
           )}
           
           <form onSubmit={handleSubmit} className="space-y-6 flex flex-col h-[70vh] min-h-[400px]">
-            <div className="flex border border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setInputType('text')}
-                className={`flex-1 py-2 ${
-                  inputType === 'text'
-                    ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium'
-                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'
-                }`}
-              >
-                <div className="flex items-center justify-center">
-                  <Text size={16} className="mr-2" />
-                  <span>Text</span>
-                </div>
-              </button>
-              <button
-                type="button"
-                onClick={() => setInputType('url')}
-                className={`flex-1 py-2 ${
-                  inputType === 'url'
-                    ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium'
-                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'
-                }`}
-              >
-                <div className="flex items-center justify-center">
-                  <LinkIcon size={16} className="mr-2" />
-                  <span>URL</span>
-                </div>
-              </button>
-            </div>
             <div className="flex-1 flex flex-col min-h-0">
-              {inputType === 'text' && (
-                <textarea
-                  ref={textareaRef}
-                  value={content}
-                  onChange={e => {
-                    setContent(e.target.value);
-                    if (textareaRef.current) {
-                      textareaRef.current.style.height = 'auto';
-                      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
-                    }
-                  }}
-                  className="w-full flex-1 p-4 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none overflow-auto min-h-[120px] max-h-none"
-                  style={{ minHeight: '120px', height: '100%', maxHeight: 'none' }}
-                  placeholder={`Get straight to the point!
-Paste your, meeting notes, revision, or any long boring document here to TLDRit!`}
-                />
-              )}
-              {inputType === 'url' && (
-                <Input
-                  type="url"
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  placeholder="Enter URL to summarize..."
-                />
-              )}
+              <textarea
+                ref={textareaRef}
+                value={content}
+                onChange={e => {
+                  setContent(e.target.value);
+                  if (textareaRef.current) {
+                    textareaRef.current.style.height = 'auto';
+                    textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+                  }
+                }}
+                className="w-full flex-1 p-4 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none overflow-auto min-h-[120px] max-h-none"
+                style={{ minHeight: '120px', height: '100%', maxHeight: 'none' }}
+                placeholder={`Paste your text or enter a URL to TLDRit!
+
+📝 Text: Meeting notes, articles, documents, etc.
+🌐 URLs: Any webpage (we'll extract the content)
+📄 Files: Drop files below
+
+Examples:
+• google.com
+• www.example.com  
+• https://news.ycombinator.com
+• Your long meeting transcript
+• Research paper content`}
+                disabled={!!file} // Disable when file is selected
+              />
             </div>
             {/* Always show drop file card below input */}
             <div className="mt-4 flex-1 flex flex-col justify-end">
@@ -522,7 +568,7 @@ Paste your, meeting notes, revision, or any long boring document here to TLDRit!
                     <p className="font-medium text-lg">{file.name}</p>
                     <button
                       type="button"
-                      onClick={() => { setFile(null); setInputType('text'); }}
+                      onClick={() => { setFile(null); setContent(''); }}
                       className="mt-2 text-base text-red-600 dark:text-red-400 hover:underline"
                     >
                       Remove

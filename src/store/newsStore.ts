@@ -368,32 +368,22 @@ export const useNewsStore = create<NewsState>((set, get) => ({
       console.log('Upserting audio to Supabase:', audioUpsertPayload);
       const { data: upsertResult } = await upsertNewsByUrlHash(audioUpsertPayload);
       
-      // Auto-bookmark when generating audio (Option 1 implementation)
+      // Get database ID for future reference
       let dbId = newsItem.dbId;
       if (upsertResult) {
         dbId = upsertResult.id;
       }
       
-      // Update local state with audio URL AND bookmark
+      // Update local state with audio URL and database ID - DO NOT auto-bookmark
       set(state => ({
         newsItems: state.newsItems.map(item => 
           item.id === newsItemId 
-            ? { ...item, audioUrl, bookmarked: true, dbId } 
+            ? { ...item, audioUrl, dbId } 
             : item
         ),
         isLoading: false,
         error: null,
       }));
-      
-      // Save bookmark to database if we have a database ID
-      if (dbId) {
-        try {
-          await upsertUserNewsMeta(user.id, dbId, { bookmarked: true });
-        } catch (error) {
-          console.error('Error auto-bookmarking after audio generation:', error);
-          // Don't revert audio generation if bookmark fails - audio is more important
-        }
-      }
       
     } catch {
       set({ 
@@ -436,10 +426,10 @@ export const useNewsStore = create<NewsState>((set, get) => ({
     }
     if (dbNews && dbNews.tldr) {
       console.log('[TLDR] Found TLDR in Supabase:', dbNews.tldr);
-      // Update local store and return
+      // Update local store and return - DO NOT auto-add to playlist
       set(state => ({
         newsItems: state.newsItems.map(item =>
-          item.id === newsItemId ? { ...item, tldr: dbNews.tldr } : item
+          item.id === newsItemId ? { ...item, tldr: dbNews.tldr, dbId: dbNews.id } : item
         ),
         tldrLoading: { ...state.tldrLoading, [newsItemId]: false },
         tldrLoadingStatus: { ...state.tldrLoadingStatus, [newsItemId]: '' },
@@ -489,10 +479,16 @@ export const useNewsStore = create<NewsState>((set, get) => ({
       console.log('Upserting TLDR to Supabase:', tldrUpsertPayload);
       const upsertResult = await upsertNewsByUrlHash(tldrUpsertPayload);
       
+      // Update local state with TLDR but DO NOT auto-add to playlist
+      let dbId = newsItem.dbId;
+      if (upsertResult && upsertResult.data) {
+        dbId = upsertResult.data.id;
+      }
+      
       set(state => ({
         newsItems: state.newsItems.map(item => 
           item.id === newsItemId 
-            ? { ...item, tldr: tldrSummary, inPlaylist: true } 
+            ? { ...item, tldr: tldrSummary, dbId } 
             : item
         ),
         tldrLoading: { ...state.tldrLoading, [newsItemId]: false },
@@ -500,11 +496,7 @@ export const useNewsStore = create<NewsState>((set, get) => ({
         error: null,
       }));
       
-      // Add to playlist for this user
-      if (upsertResult && upsertResult.data && upsertResult.data.id) {
-        await upsertUserNewsMeta(user.id, upsertResult.data.id, { in_playlist: true });
-      }
-      console.log('[TLDR] Updated local state and playlist');
+      console.log('[TLDR] Updated local state - TLDR generated but NOT added to playlist');
     } catch (error) {
       console.error('[TLDR] Error generating TLDR:', error);
       set(state => ({

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Volume2, Bookmark, BookmarkCheck, FileText, Copy, Headphones, ChevronDown, X } from 'lucide-react';
+import { Volume2, Save, Check, FileText, Copy, Headphones, ChevronDown, X } from 'lucide-react';
 import { NewsItem as NewsItemType } from '../../types';
 import Card, { CardContent } from '../ui/Card';
 import { useNewsStore } from '../../store/newsStore';
@@ -97,6 +97,29 @@ const NewsItem: React.FC<NewsItemProps> = ({ item }) => {
             setCurrentlyPlaying(null);
           }
         }
+      } finally {
+        setAudioLoading(prev => ({ ...prev, [item.id]: false }));
+      }
+    }
+  };
+
+  const handleHeadphonesClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (!user) {
+      setShowLoginDialog(true);
+      return;
+    }
+
+    // Toggle playlist status first
+    await useNewsStore.getState().togglePlaylist(item.id);
+    
+    // If not in playlist and no audio, generate audio
+    const updatedNewsItem = useNewsStore.getState().newsItems.find(i => i.id === item.id);
+    if (updatedNewsItem?.inPlaylist && !updatedNewsItem.audioUrl) {
+      setAudioLoading(prev => ({ ...prev, [item.id]: true }));
+      try {
+        await generateAudioForNewsItem(item.id);
       } finally {
         setAudioLoading(prev => ({ ...prev, [item.id]: false }));
       }
@@ -224,16 +247,17 @@ const NewsItem: React.FC<NewsItemProps> = ({ item }) => {
                       <button
                         onClick={() => useNewsStore.getState().toggleBookmark(item.id)}
                         className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                        title={item.bookmarked ? 'Remove bookmark' : 'Bookmark this TLDR'}
+                        title={item.bookmarked ? 'Remove from saved' : 'Save this TLDR'}
                       >
                         {item.bookmarked ? (
-                          <BookmarkCheck size={20} className="text-green-500" />
+                          <Check size={20} className="text-green-500" />
                         ) : (
-                          <Bookmark size={20} className="text-gray-500 dark:text-gray-400" />
+                          <Save size={20} className="text-gray-500 dark:text-gray-400" />
                         )}
                       </button>
                       <button
-                        onClick={() => useNewsStore.getState().togglePlaylist(item.id)}
+                        onClick={handleHeadphonesClick}
+                        disabled={audioLoading[item.id]}
                         className={`p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${item.inPlaylist ? 'bg-purple-100 dark:bg-purple-900/20' : ''}`}
                         title={item.inPlaylist ? 'Remove from Listen playlist' : 'Add to Listen playlist'}
                       >

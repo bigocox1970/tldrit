@@ -6,12 +6,11 @@ import { useAudioStore } from '../store/audioStore';
 import Card, { CardContent } from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import ReactMarkdown from 'react-markdown';
-import { Volume2, Copy, Check, CheckSquare, Square, ChevronDown, Bookmark, Newspaper, FileText, Headphones } from 'lucide-react';
+import { Volume2, Copy, Check, CheckSquare, Square, ChevronDown, Save, FileText, Headphones } from 'lucide-react';
 import { Summary } from '../types';
 import { getExampleSummaries, getBookmarkedNewsItems } from '../lib/supabase';
 import { useNewsStore } from '../store/newsStore';
 import UpgradeModal from '../components/ui/UpgradeModal';
-import NoAudioModal from '../components/ui/NoAudioModal';
 
 interface BookmarkedNewsItem {
   id: string;
@@ -65,8 +64,6 @@ const SavedPage: React.FC = () => {
   
   // Add new state for modals
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [showNoAudioModal, setShowNoAudioModal] = useState(false);
-  const [noAudioItemType, setNoAudioItemType] = useState<'TLDR' | 'news'>('TLDR');
   
   // Fetch bookmarked news items
   const fetchBookmarkedNews = async () => {
@@ -226,11 +223,8 @@ const SavedPage: React.FC = () => {
         await fetchSummaries();
       } catch (error) {
         console.error('Error generating audio:', error);
-        // Show error modal for character limit
-        if (error instanceof Error && error.message.includes('700 characters')) {
-          setNoAudioItemType('TLDR');
-          setShowNoAudioModal(true);
-        }
+        // Show upgrade modal for character limit or other TTS errors
+        setShowUpgradeModal(true);
       } finally {
         setAudioLoading(prev => ({ ...prev, [summary.id]: false }));
       }
@@ -287,11 +281,8 @@ const SavedPage: React.FC = () => {
         toggleAudio(newsItem.id, audioUrl);
       } catch (error) {
         console.error('Error generating audio:', error);
-        // Show error modal for character limit
-        if (error instanceof Error && error.message.includes('700 characters')) {
-          setNoAudioItemType('news');
-          setShowNoAudioModal(true);
-        }
+        // Show upgrade modal for character limit or other TTS errors
+        setShowUpgradeModal(true);
       } finally {
         setNewsAudioLoading(prev => ({ ...prev, [newsItem.id]: false }));
       }
@@ -301,11 +292,23 @@ const SavedPage: React.FC = () => {
   const handlePlaylistToggle = async (summary: Summary) => {
     if (!user) return;
     
-    // Check if trying to add to playlist but no audio exists
-    if (!summary.inPlaylist && !summary.audioUrl) {
-      setNoAudioItemType('TLDR');
-      setShowNoAudioModal(true);
-      return;
+    // If no audio exists, generate it first
+    if (!summary.audioUrl) {
+      setAudioLoading(prev => ({ ...prev, [summary.id]: true }));
+      try {
+        await generateAudioForSummary(summary.id);
+        // After generating, the summary store will update and we can proceed with playlist toggle
+        await fetchSummaries();
+      } catch (error) {
+        console.error('Error generating audio:', error);
+        // Show upgrade modal if user doesn't have access
+        if (error instanceof Error && error.message.includes('upgrade')) {
+          setShowUpgradeModal(true);
+          return;
+        }
+      } finally {
+        setAudioLoading(prev => ({ ...prev, [summary.id]: false }));
+      }
     }
     
     // Proceed with normal playlist toggle
@@ -315,11 +318,53 @@ const SavedPage: React.FC = () => {
   const handleNewsPlaylistToggle = async (newsItem: BookmarkedNewsItem) => {
     if (!user) return;
     
-    // Check if trying to add to playlist but no audio exists
-    if (!newsItem.inPlaylist && !newsItem.audioUrl) {
-      setNoAudioItemType('news');
-      setShowNoAudioModal(true);
-      return;
+    // If no audio exists, generate it first
+    if (!newsItem.audioUrl) {
+      setNewsAudioLoading(prev => ({ ...prev, [newsItem.id]: true }));
+      try {
+        // Generate audio for news item
+        const { generateAudio } = await import('../lib/ai');
+        const audioText = newsItem.tldr || newsItem.summary;
+        const audioUrl = await generateAudio(
+          audioText, 
+          user?.plan || 'free', 
+          'news', 
+          newsItem.title,
+          newsItem.sourceUrl
+        );
+        
+        // Update the audio URL in the database
+        const { upsertNewsByUrlHash } = await import('../lib/supabase');
+        const { urlToHash } = await import('../lib/hash');
+        const urlHash = urlToHash(newsItem.sourceUrl);
+        await upsertNewsByUrlHash({
+          url_hash: urlHash,
+          source_url: newsItem.sourceUrl,
+          title: newsItem.title,
+          summary: newsItem.summary,
+          category: newsItem.category,
+          audio_url: audioUrl,
+          published_at: newsItem.publishedAt
+        });
+        
+        // Update local state with audio URL
+        setBookmarkedNews(prev => 
+          prev.map(item => 
+            item.id === newsItem.id 
+              ? { ...item, audioUrl }
+              : item
+          )
+        );
+      } catch (error) {
+        console.error('Error generating audio:', error);
+        // Show upgrade modal if user doesn't have access  
+        if (error instanceof Error && error.message.includes('upgrade')) {
+          setShowUpgradeModal(true);
+          return;
+        }
+      } finally {
+        setNewsAudioLoading(prev => ({ ...prev, [newsItem.id]: false }));
+      }
     }
     
     try {
@@ -506,7 +551,7 @@ const SavedPage: React.FC = () => {
           }`}
         >
           <div className="flex items-center justify-center gap-2">
-            <Bookmark size={16} />
+            <Save size={16} />
             <span>News TLDRs ({bookmarkedNews.length})</span>
           </div>
         </button>
@@ -762,12 +807,11 @@ const SavedPage: React.FC = () => {
           {bookmarkedNews.length === 0 ? (
             <Card>
               <CardContent className="text-center py-8">
-                <Newspaper size={48} className="mx-auto text-gray-400 mb-4" />
-                <h3 className="text-lg font-medium mb-4">
-                  No bookmarked news TLDRs yet
-                </h3>
-                <p className="text-gray-600 dark:text-gray-400 mb-4">
-                  Bookmark news articles on the News page to see them here
+                <p className="text-gray-500 dark:text-gray-400 text-center">
+                  No saved news TLDRs yet
+                </p>
+                <p className="text-gray-400 dark:text-gray-500 text-center text-sm">
+                  Save news articles on the News page to see them here
                 </p>
                 <Button 
                   variant="primary"
@@ -967,15 +1011,6 @@ const SavedPage: React.FC = () => {
         <UpgradeModal
           isOpen={showUpgradeModal}
           onClose={() => setShowUpgradeModal(false)}
-        />
-      )}
-
-      {/* No Audio Modal */}
-      {showNoAudioModal && (
-        <NoAudioModal
-          isOpen={showNoAudioModal}
-          onClose={() => setShowNoAudioModal(false)}
-          itemType={noAudioItemType}
         />
       )}
     </div>

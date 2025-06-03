@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, FileText, Newspaper, Bookmark, Headphones } from 'lucide-react';
+import { Home, FileText, Newspaper, Save, Headphones } from 'lucide-react';
 
 const Navigation: React.FC = () => {
   const location = useLocation();
@@ -13,7 +13,7 @@ const Navigation: React.FC = () => {
     { path: '/', icon: Home, label: 'Home' },
     { path: '/summarize', icon: FileText, label: 'TL;DR' },
     { path: '/news', icon: Newspaper, label: 'News' },
-    { path: '/saved', icon: Bookmark, label: 'Saved' },
+    { path: '/saved', icon: Save, label: 'Saved' },
     { path: '/listen', icon: Headphones, label: 'Listen' },
   ];
   
