@@ -66,6 +66,7 @@ export async function getCurrentUser() {
       isPremium: profile?.is_premium || false,
       interests: profile?.interests || [],
       eli5Age: profile?.eli5_age ?? 5,
+      plan: profile?.plan || 'free',
     },
     error: profileError,
   };

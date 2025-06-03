@@ -39,8 +39,8 @@ const MiniTLDR: React.FC = () => {
         return;
       }
       
-      if (selectedFile.size > 5 * 1024 * 1024) { // 5MB limit for free users
-        alert('File size is limited to 5MB. Please upload a smaller file.');
+      if (selectedFile.size > 20 * 1024 * 1024) { // 20MB limit 
+        alert('File size must be under 20MB. Please upload a smaller file.');
         return;
       }
       
@@ -60,8 +60,8 @@ const MiniTLDR: React.FC = () => {
         return;
       }
       
-      if (selectedFile.size > 5 * 1024 * 1024) { // 5MB limit for free users
-        alert('File size is limited to 5MB. Please upload a smaller file.');
+      if (selectedFile.size > 20 * 1024 * 1024) { // 20MB limit 
+        alert('File size must be under 20MB. Please upload a smaller file.');
         return;
       }
       

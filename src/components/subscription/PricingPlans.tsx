@@ -176,9 +176,7 @@ const PricingPlans: React.FC = () => {
       <div className="container mx-auto px-4 pt-8">
         <div className="flex flex-col lg:flex-row justify-center gap-8">
           {plans.map((plan) => {
-            const isCurrentPlan =
-              (plan.id === 'free' && !user?.isPremium) ||
-              ((plan.id === 'pro' || plan.id === 'premium') && user?.isPremium);
+            const isCurrentPlan = user?.plan === plan.id;
 
             return (
               <Card
@@ -284,6 +282,12 @@ const PricingPlans: React.FC = () => {
               </Card>
             );
           })}
+        </div>
+        
+        <div className="mt-8 text-center">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            * Maximum file size: 20MB for all plans
+          </p>
         </div>
         
         <div className="mt-16 text-center">

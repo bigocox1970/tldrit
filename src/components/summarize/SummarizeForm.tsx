@@ -140,12 +140,21 @@ const SummarizeForm: React.FC<SummarizeFormProps> = ({
         return;
       }
       
-      if (!user?.isPremium) {
-        const wordCount = content.split(/\s+/).length;
-        if (wordCount > 1000) {
-          setError('Free accounts are limited to 1000 words. Upgrade to summarize longer content.');
-          return;
-        }
+      // Check word count limits based on plan
+      const wordCount = content.split(/\s+/).filter(word => word.length > 0).length;
+      const planLimits = {
+        free: 1000,
+        pro: 10000,
+        premium: Infinity
+      };
+      
+      const userPlan = user?.plan || 'free';
+      const wordLimit = planLimits[userPlan as keyof typeof planLimits];
+      
+      if (wordLimit !== Infinity && wordCount > wordLimit) {
+        setError(`${userPlan === 'free' ? 'Free' : 'Pro'} accounts are limited to ${wordLimit.toLocaleString()} words per document. Upgrade to process longer content.`);
+        setShowUpgradeModal(true);
+        return;
       }
       
       await createSummary({
@@ -195,12 +204,21 @@ const SummarizeForm: React.FC<SummarizeFormProps> = ({
         return;
       }
       
-      if (!user?.isPremium) {
-        const wordCount = content.split(/\s+/).length;
-        if (wordCount > 1000) {
-          setError('Free accounts are limited to 1000 words. Upgrade to summarize longer content.');
-          return;
-        }
+      // Check word count limits based on plan
+      const wordCount = content.split(/\s+/).filter(word => word.length > 0).length;
+      const planLimits = {
+        free: 1000,
+        pro: 10000,
+        premium: Infinity
+      };
+      
+      const userPlan = user?.plan || 'free';
+      const wordLimit = planLimits[userPlan as keyof typeof planLimits];
+      
+      if (wordLimit !== Infinity && wordCount > wordLimit) {
+        setError(`${userPlan === 'free' ? 'Free' : 'Pro'} accounts are limited to ${wordLimit.toLocaleString()} words per document. Upgrade to process longer content.`);
+        setShowUpgradeModal(true);
+        return;
       }
       
       await createSummary({
@@ -250,8 +268,11 @@ const SummarizeForm: React.FC<SummarizeFormProps> = ({
     if (e.target.files && e.target.files[0]) {
       const selectedFile = e.target.files[0];
       
-      if (!user?.isPremium && selectedFile.size > 5 * 1024 * 1024) {
-        setError('Free accounts are limited to 5MB files. Upgrade to process larger files.');
+      // Check file size limit - generous 20MB for all plans to avoid confusion
+      const fileSizeLimit = 20 * 1024 * 1024; // 20MB for all plans
+      
+      if (selectedFile.size > fileSizeLimit) {
+        setError('File size must be under 20MB. Please choose a smaller file.');
         return;
       }
       
@@ -291,8 +312,11 @@ const SummarizeForm: React.FC<SummarizeFormProps> = ({
         return;
       }
       
-      if (!user?.isPremium && selectedFile.size > 5 * 1024 * 1024) {
-        setError('Free accounts are limited to 5MB files. Upgrade to process larger files.');
+      // Check file size limit - generous 20MB for all plans to avoid confusion
+      const fileSizeLimit = 20 * 1024 * 1024; // 20MB for all plans
+      
+      if (selectedFile.size > fileSizeLimit) {
+        setError('File size must be under 20MB. Please choose a smaller file.');
         return;
       }
       
@@ -515,7 +539,7 @@ Paste your, meeting notes, revision, or any long boring document here to TLDRit!
                         {isDragOver ? 'Drop file here!' : 'Drop file here or click to upload'}
                       </p>
                       <p className="text-base text-gray-500 dark:text-gray-400">
-                        Supports PDF, DOCX, TXT (max {user?.isPremium ? '20MB' : '5MB'})
+                        Supports PDF, DOCX, TXT (max 20MB)
                       </p>
                     </div>
                   </label>
