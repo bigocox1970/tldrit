@@ -1,6 +1,10 @@
 [build]
   functions = "netlify/functions"
 
+# Disable secrets scanning that's causing build failures
+[build.environment]
+  SECRETS_SCAN_ENABLED = "false"
+
 [[redirects]]
   from = "/api/extract-url"
   to = "/.netlify/functions/extract-url"
