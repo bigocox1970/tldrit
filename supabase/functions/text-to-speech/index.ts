@@ -62,11 +62,11 @@ serve(async (req: Request) => {
     if (isPremium) {
       const { data: profile, error: profileError } = await supabaseClient
         .from("profiles")
-        .select("is_premium")
+        .select("plan")
         .eq("id", user.id)
         .single();
 
-      if (profileError || !profile || !profile.is_premium) {
+      if (profileError || !profile || (profile.plan !== 'pro' && profile.plan !== 'premium')) {
         return new Response(
           JSON.stringify({ error: "Premium subscription required for this feature" }),
           {

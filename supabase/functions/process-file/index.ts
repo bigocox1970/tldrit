@@ -68,11 +68,11 @@ serve(async (req: Request) => {
     // Check if the user is premium
     const { data: profile, error: profileError } = await supabaseClient
       .from("profiles")
-      .select("is_premium")
+      .select("plan")
       .eq("id", user.id)
       .single();
 
-    const isPremium = profile?.is_premium || false;
+    const isPremium = profile?.plan === 'pro' || profile?.plan === 'premium';
 
     // Get form data with the file
     const formData = await req.formData();

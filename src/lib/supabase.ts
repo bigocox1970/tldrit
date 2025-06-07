@@ -63,7 +63,7 @@ export async function getCurrentUser() {
     user: {
       id: data.user.id,
       email: data.user.email,
-      isPremium: profile?.is_premium || false,
+      isPremium: profile?.plan === 'pro' || profile?.plan === 'premium',
       interests: profile?.interests || [],
       eli5Age: profile?.eli5_age ?? 5,
       plan: profile?.plan || 'free',
