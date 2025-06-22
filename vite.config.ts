@@ -36,7 +36,7 @@ export default defineConfig(({ mode }) => {
       react(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['tldrit-favicon.png', 'TLDRit-icon.png', 'TLDRit-logo.png'],
+        includeAssets: ['tldrit-favicon.png', 'tldrit-icon.png', 'TLDRit-logo.png'],
         manifest: {
           name: 'TLDRit - AI Summarization',
           short_name: 'TLDRit',
@@ -44,17 +44,17 @@ export default defineConfig(({ mode }) => {
           theme_color: '#4285F4',
           icons: [
             {
-              src: '/TLDRit-icon.png',
+              src: '/tldrit-icon.png',
               sizes: '192x192',
               type: 'image/png'
             },
             {
-              src: '/TLDRit-icon.png',
+              src: '/tldrit-icon.png',
               sizes: '512x512',
               type: 'image/png'
             },
             {
-              src: '/TLDRit-icon.png',
+              src: '/tldrit-icon.png',
               sizes: '512x512',
               type: 'image/png',
               purpose: 'any maskable'

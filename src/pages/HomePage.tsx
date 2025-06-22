@@ -87,7 +87,7 @@ const HomePage: React.FC = () => {
       {/* Ad Banner for ELI5.app with 3D flip animation */}
       <div className="w-full flex justify-center mt-8 mb-4">
         <a
-          href="https://eli5.app"
+          href="https://eli5it.app/"
           target="_blank"
           rel="noopener noreferrer"
           className="block w-[728px] max-w-full h-[90px] overflow-hidden bg-gradient-to-r from-blue-700 via-pink-500 to-yellow-400 rounded-lg shadow-lg flex items-center justify-center border-2 border-blue-300 hover:shadow-xl transition px-8 py-4"
@@ -147,6 +147,17 @@ const HomePage: React.FC = () => {
               </div>
             </div>
           </div>
+        </a>
+      </div>
+      <div className="text-center text-xs text-gray-500 pb-4">
+        App design by{' '}
+        <a
+          href="https://diamondinternet.co.uk/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline hover:text-gray-700"
+        >
+          Diamond Internet
         </a>
       </div>
     </div>

@@ -3,12 +3,12 @@
   "short_name": "TLDRit",
   "icons": [
     {
-      "src": "/TLDRit-icon.png",
+      "src": "/tldrit-icon.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "/TLDRit-icon.png",
+      "src": "/tldrit-icon.png",
       "sizes": "512x512",
       "type": "image/png"
     }
